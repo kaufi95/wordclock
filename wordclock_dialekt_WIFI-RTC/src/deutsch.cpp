@@ -16,7 +16,7 @@ E L F Z E H N E U H R
 
 #include <Arduino.h>
 #include <TimeLib.h>
-#include <array>
+#include <FastLED.h>
 #include "matrixUtils.h"
 
 namespace deutsch
@@ -42,22 +42,27 @@ namespace deutsch
     void half();
     void uhr();
 
-    std::array<std::array<bool, 11>, 11> *matrix;
+    CRGB *leds;
+    uint8_t red, green, blue;
 
-    // converts time into matrix
-    void timeToPixels(time_t time, std::array<std::array<bool, 11>, 11> &_matrix)
+    // converts time directly to LED array
+    void timeToLeds(time_t time, CRGB* _leds, uint8_t _red, uint8_t _green, uint8_t _blue)
     {
-        matrix = &_matrix;
+        leds = _leds;
+        red = _red;
+        green = _green;
+        blue = _blue;
+        
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
 
-        // show "Es ist" or "Es isch" randomized
+        // show "Es ist" 
         if (showEsIst(minutes))
         {
             // Es ist
             Serial.print("Es ist ");
-            turnPixelsOn(1, 2, 0, *matrix);
-            turnPixelsOn(5, 7, 0, *matrix);
+            turnLedsOn(1, 2, leds, red, green, blue);    // "ES" - LEDs 1-2
+            turnLedsOn(5, 7, leds, red, green, blue);    // "IST" - LEDs 5-7
         }
 
         // show minutes
@@ -213,7 +218,10 @@ namespace deutsch
             uhr();
         }
 
-        turnPixelsOnMinutes(0, minutes % 5, 10, *matrix);
+        // Show minute dots (LEDs 110-113)
+        for (uint8_t i = 0; i < (minutes % 5); i++) {
+            leds[110 + i] = CRGB(red, green, blue);
+        }
 
         Serial.print(" + ");
         Serial.print(minutes % 5);
@@ -230,12 +238,12 @@ namespace deutsch
         if (s)
         {
             Serial.print("eins");
-            turnPixelsOn(7, 10, 4, *matrix);
+            turnLedsOn(47, 50, leds, red, green, blue);  // "EINS" - row 4, cols 7-10
         }
         else
         {
             Serial.print("ein");
-            turnPixelsOn(7, 9, 4, *matrix);
+            turnLedsOn(47, 49, leds, red, green, blue);  // "EIN" - row 4, cols 7-9
         }
     }
 
@@ -243,105 +251,105 @@ namespace deutsch
     {
         // zwoa/zwei
         Serial.print("zwei");
-        turnPixelsOn(5, 8, 4, *matrix);
+        turnLedsOn(45, 48, leds, red, green, blue);  // "ZWEI" - row 4, cols 5-8
     }
 
     void hour_three()
     {
         // drei
         Serial.print("drei");
-        turnPixelsOn(0, 3, 5, *matrix);
+        turnLedsOn(55, 58, leds, red, green, blue);  // "DREI" - row 5, cols 0-3
     }
 
     void hour_four()
     {
         // vier/e/vier
         Serial.print("vier");
-        turnPixelsOn(0, 3, 8, *matrix);
+        turnLedsOn(80, 83, leds, red, green, blue);  // "VIER" - row 8, cols 0-3
     }
 
     void hour_five()
     {
         // fünfe/fünf
         Serial.print("fünf");
-        turnPixelsOn(0, 3, 7, *matrix);
+        turnLedsOn(77, 80, leds, red, green, blue);  // "FÜNF" - row 7, cols 0-3
     }
 
     void min_five()
     {
         // fünf/fünf
         Serial.print("fünf");
-        turnPixelsOn(0, 3, 1, *matrix);
+        turnLedsOn(11, 14, leds, red, green, blue);  // "FÜNF" - row 1, cols 0-3
     }
 
     void hour_six()
     {
         // sechse/sechs
         Serial.print("sechs");
-        turnPixelsOn(5, 9, 5, *matrix);
+        turnLedsOn(60, 64, leds, red, green, blue);  // "SECHS" - row 5, cols 5-9
     }
 
     void hour_seven()
     {
         // siebne/sieben
         Serial.print("sieben");
-        turnPixelsOn(0, 5, 6, *matrix);
+        turnLedsOn(66, 71, leds, red, green, blue);  // "SIEBEN" - row 6, cols 0-5
     }
 
     void hour_eight()
     {
         // achte/acht
         Serial.print("acht");
-        turnPixelsOn(6, 9, 7, *matrix);
+        turnLedsOn(72, 75, leds, red, green, blue);  // "ACHT" - row 7, cols 6-9
     }
 
     void hour_nine()
     {
         // nüne/neun
         Serial.print("neun");
-        turnPixelsOn(7, 10, 6, *matrix);
+        turnLedsOn(73, 76, leds, red, green, blue);  // "NEUN" - row 6, cols 7-10
     }
 
     void hour_ten()
     {
         // zehne/zehn
         Serial.print("zehn");
-        turnPixelsOn(3, 6, 9, *matrix);
+        turnLedsOn(103, 106, leds, red, green, blue);  // "ZEHN" - row 9, cols 3-6
     }
 
     void min_ten()
     {
         // zehn/zehn
         Serial.print("zehn");
-        turnPixelsOn(7, 10, 2, *matrix);
+        turnLedsOn(18, 21, leds, red, green, blue);  // "ZEHN" - row 2, cols 7-10
     }
 
     void hour_eleven()
     {
         // elfe/elf
         Serial.print("elf");
-        turnPixelsOn(0, 2, 9, *matrix);
+        turnLedsOn(99, 101, leds, red, green, blue);  // "ELF" - row 9, cols 0-2
     }
 
     void hour_twelve()
     {
         // zwölfe/zwölf
         Serial.print("zwölf");
-        turnPixelsOn(5, 9, 8, *matrix);
+        turnLedsOn(84, 88, leds, red, green, blue);  // "ZWÖLF" - row 8, cols 5-9
     }
 
     void quarter()
     {
         // viertel
         Serial.print("viertel");
-        turnPixelsOn(0, 6, 2, *matrix);
+        turnLedsOn(22, 28, leds, red, green, blue);  // "VIERTEL" - row 2, cols 0-6
     }
 
     void twenty()
     {
         // zwanzig
         Serial.print("zwanzig");
-        turnPixelsOn(4, 10, 1, *matrix);
+        turnLedsOn(15, 21, leds, red, green, blue);  // "ZWANZIG" - row 1, cols 4-10
     }
 
     // ------------------------------------------------------------
@@ -350,27 +358,27 @@ namespace deutsch
     {
         // vor/vor
         Serial.print("vor");
-        turnPixelsOn(1, 3, 3, *matrix);
+        turnLedsOn(34, 36, leds, red, green, blue);  // "VOR" - row 3, cols 1-3
     }
 
     void after()
     {
         // noch/nach
         Serial.print("nach");
-        turnPixelsOn(5, 8, 3, *matrix);
+        turnLedsOn(38, 41, leds, red, green, blue);  // "NACH" - row 3, cols 5-8
     }
 
     void half()
     {
         // halb
         Serial.print("halb");
-        turnPixelsOn(0, 3, 4, *matrix);
+        turnLedsOn(44, 47, leds, red, green, blue);  // "HALB" - row 4, cols 0-3
     }
 
     void uhr()
     {
         Serial.print(" uhr");
-        turnPixelsOn(8, 10, 9, *matrix);
+        turnLedsOn(107, 109, leds, red, green, blue);  // "UHR" - row 9, cols 8-10
     }
 
 } // namespace deutsch

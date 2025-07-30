@@ -2,11 +2,9 @@
 #define MATRIXUTILS_H
 
 #include <Arduino.h>
-#include <array>
+#include <FastLED.h>
 
 bool showEsIst(uint8_t minutes);
-void turnPixelsOn(uint8_t start, uint8_t end, uint8_t row, std::array<std::array<bool, 11>, 11> &matrix);
-void turnPixelsOnMinutes(uint8_t start, uint8_t end, uint8_t row, std::array<std::array<bool, 11>, 11> &matrix);
-void printPixelsToSerial(std::array<std::array<bool, 11>, 11> &pixels);
+void turnLedsOn(uint16_t start, uint16_t end, CRGB* leds, uint8_t red, uint8_t green, uint8_t blue);
 
 #endif

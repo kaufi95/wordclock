@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include <array>
+#include <FastLED.h>
+#include "matrixUtils.h"
 
 // determine if "es isch" is shown
 bool showEsIst(uint8_t minutes)
@@ -8,33 +9,11 @@ bool showEsIst(uint8_t minutes)
     return randomized || minutes % 30 < 5;
 }
 
-// turn on pixels in matrix
-void turnPixelsOn(uint8_t start, uint8_t end, uint8_t row, std::array<std::array<bool, 11>, 11> &matrix)
+// turn on LEDs directly using LED indices
+void turnLedsOn(uint16_t start, uint16_t end, CRGB* leds, uint8_t red, uint8_t green, uint8_t blue)
 {
-    for (uint8_t i = start; i <= end; i++)
+    for (uint16_t i = start; i <= end; i++)
     {
-        matrix[row][i] = true;
-    }
-}
-
-// pixels for minutes in additional row
-void turnPixelsOnMinutes(uint8_t start, uint8_t end, uint8_t row, std::array<std::array<bool, 11>, 11> &matrix)
-{
-    for (uint8_t i = start; i < end; i++)
-    {
-        matrix[row][i] = true;
-    }
-}
-
-// prints pixels to serial
-void printPixelsToSerial(std::array<std::array<bool, 11>, 11> &pixels)
-{
-    for (uint8_t i = 0; i < 11; i++)
-    {
-        for (uint8_t j = 0; j < 11; j++)
-        {
-            Serial.print(pixels[i][j] ? "1" : "0");
-        }
-        Serial.println();
+        leds[i] = CRGB(red, green, blue);
     }
 }

@@ -1,76 +1,103 @@
+// UI Elements
 const colorPicker = document.getElementById('color-picker');
 
+const redSlider = document.getElementById('red-slider');
+const greenSlider = document.getElementById('green-slider');
+const blueSlider = document.getElementById('blue-slider');
+
+const redValue = document.getElementById('red-value');
+const greenValue = document.getElementById('green-value');
+const blueValue = document.getElementById('blue-value');
+
 const languageButtons = document.querySelectorAll('input[name="language"]');
-const brightnessButtons = document.querySelectorAll('input[name="brightness"]');
-const terminateAP_input = document.getElementById('terminateAP');
 
-const wifi_div = document.getElementById('wifi');
-const ntp_input = document.getElementById('ntp');
-const ssid_input = document.getElementById('ssid');
-const pw_input = document.getElementById('pw');
-const status = document.getElementById('status');
+const brightnessSlider = document.getElementById('brightness-slider');
+const brightnessValue = document.getElementById('brightness-value');
 
-// hide the div container with id "wifi" if the ntp checkbox is unchecked
-ntp_input.addEventListener('change', () => {
-  wifi_div.style.display = ntp_input.checked ? 'block' : 'none';
+// WiFi reset button
+const resetWifiBtn = document.getElementById('reset-wifi-btn');
+
+// Color synchronization between picker and sliders
+function updateColorFromSliders(sendUpdate = false) {
+  const r = parseInt(redSlider.value);
+  const g = parseInt(greenSlider.value);
+  const b = parseInt(blueSlider.value);
+
+  const hex = `#${r.toString(16).padStart(2, '0')}${g
+    .toString(16)
+    .padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  colorPicker.value = hex;
+
+  redValue.textContent = r;
+  greenValue.textContent = g;
+  blueValue.textContent = b;
+
+  // Only send update when explicitly requested
+  if (sendUpdate) {
+    sendUpdateRequest();
+  }
+}
+
+function updateSlidersFromColor() {
+  const hex = colorPicker.value;
+  const r = parseInt(hex.substr(1, 2), 16);
+  const g = parseInt(hex.substr(3, 2), 16);
+  const b = parseInt(hex.substr(5, 2), 16);
+
+  redSlider.value = r;
+  greenSlider.value = g;
+  blueSlider.value = b;
+
+  // Update display without triggering another update request
+  redValue.textContent = r;
+  greenValue.textContent = g;
+  blueValue.textContent = b;
+
+  // Send the update request
+  sendUpdateRequest();
+}
+
+// Event listeners - update display on input, send request on change
+redSlider.addEventListener('input', () => updateColorFromSliders(false));
+redSlider.addEventListener('change', () => updateColorFromSliders(true));
+greenSlider.addEventListener('input', () => updateColorFromSliders(false));
+greenSlider.addEventListener('change', () => updateColorFromSliders(true));
+blueSlider.addEventListener('input', () => updateColorFromSliders(false));
+blueSlider.addEventListener('change', () => updateColorFromSliders(true));
+colorPicker.addEventListener('input', updateSlidersFromColor);
+
+brightnessSlider.addEventListener('input', () => {
+  brightnessValue.textContent = brightnessSlider.value;
 });
 
-if (!!window.EventSource) {
-  var source = new EventSource('/events');
+brightnessSlider.addEventListener('change', () => {
+  sendUpdateRequest();
+});
 
-  source.addEventListener(
-    'open',
-    function (e) {
-      console.log('Events Connected');
-    },
-    false
-  );
-  source.addEventListener(
-    'error',
-    function (e) {
-      if (e.target.readyState != EventSource.OPEN) {
-        console.log('Events Disconnected');
-      }
-    },
-    false
-  );
+// Add real-time update listeners for language change
+languageButtons.forEach((button) => {
+  button.addEventListener('change', sendUpdateRequest);
+});
 
-  source.addEventListener(
-    'message',
-    function (e) {
-      console.log('message', e.data);
-    },
-    false
-  );
-
-  source.addEventListener(
-    'status',
-    function (e) {
-      console.log('status', e.data);
-      document.getElementById('status').innerHTML = e.data;
-    },
-    false
-  );
-}
+// WiFi reset button event listener
+resetWifiBtn.addEventListener('click', resetWiFiSettings);
 
 document.addEventListener('DOMContentLoaded', () => {
   onLoad();
+  updateColorFromSliders(); // Initialize color display
 });
 
 function updateUI(data) {
-  updateColor(data.color);
+  updateColor(data.red, data.green, data.blue);
   updateLanguage(data.language);
   updateBrightness(data.brightness);
-  updateTerminateAP(data.terminateAP);
-  updateSSID(data.ssid);
-  updatePW('');
-  updateStatus(data.status);
-  updateNTP(data.ntp);
 }
 
-function updateColor(color) {
-  colorPicker.value = rgb5652hex(color);
-  colorPicker.select();
+function updateColor(red, green, blue) {
+  redSlider.value = red || 255;
+  greenSlider.value = green || 255;
+  blueSlider.value = blue || 255;
+  updateColorFromSliders();
 }
 
 function updateLanguage(language) {
@@ -82,36 +109,18 @@ function updateLanguage(language) {
 }
 
 function updateBrightness(brightness) {
-  brightnessButtons.forEach((button) => {
-    if (button.value === brightness.toString()) {
-      button.checked = true;
-    }
-  });
+  brightnessSlider.value = brightness || 128;
+  brightnessValue.textContent = brightness || 128;
 }
 
-function updateTerminateAP(terminateAP) {
-  terminateAP_input.checked = terminateAP;
-}
+// WiFi status functions removed
 
-function updateNTP(ntp) {
-  ntp_input.checked = ntp;
-  // wifi_div.style.display = ntp ? 'block' : 'none';
-}
-
-function updateSSID(ssid) {
-  ssid_input.value = ssid;
-}
-
-function updatePW(pw) {
-  pw_input.value = pw;
-}
-
-function updateStatus(status) {
-  status.innerText = status;
-}
-
-function getSelectedColor() {
-  return hex2rgb565(colorPicker.value);
+function getSelectedRGB() {
+  return {
+    red: parseInt(redSlider.value),
+    green: parseInt(greenSlider.value),
+    blue: parseInt(blueSlider.value)
+  };
 }
 
 function getSelectedLanguage() {
@@ -125,29 +134,7 @@ function getSelectedLanguage() {
 }
 
 function getSelectedBrightness() {
-  let selectedBrightness = '';
-  brightnessButtons.forEach((button) => {
-    if (button.checked) {
-      selectedBrightness = button.value;
-    }
-  });
-  return selectedBrightness;
-}
-
-function getTerminateAP() {
-  return terminateAP_input.checked;
-}
-
-function getNTP() {
-  return ntp_input.checked;
-}
-
-function getSSID() {
-  return ssid_input.value;
-}
-
-function getPW() {
-  return pw_input.value;
+  return parseInt(brightnessSlider.value);
 }
 
 function onLoad() {
@@ -166,24 +153,17 @@ function onLoad() {
     .catch((error) => console.error('Error sending GET request:', error));
 }
 
-function sendPostRequest() {
-  const color = getSelectedColor();
+function sendUpdateRequest() {
+  const rgb = getSelectedRGB();
   const language = getSelectedLanguage();
   const brightness = getSelectedBrightness();
-  const terminateAP = getTerminateAP();
-  const ntp = getNTP();
-  const ssid = getSSID();
-  const pw = getPW();
 
   const body = {
-    datetime: Math.round(new Date().getTime() / 1000),
-    color: color,
+    red: rgb.red,
+    green: rgb.green,
+    blue: rgb.blue,
     language: language,
-    brightness: brightness,
-    terminateAP: terminateAP,
-    ntp: ntp,
-    ssid: ssid,
-    pw: pw
+    brightness: brightness
   };
 
   fetch('http://' + window.location.host + '/update', {
@@ -197,39 +177,52 @@ function sendPostRequest() {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      console.log('POST request sent successfully');
+      console.log('Settings updated successfully');
       console.log(body);
     })
-    .catch((error) => console.error('Error sending POST request:', error));
+    .catch((error) => {
+      console.error('Error sending update request:', error);
+    });
 }
 
-const hex2rgb565 = (hex) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-
-  const r5 = (r * 31) / 255;
-  const g6 = (g * 63) / 255;
-  const b5 = (b * 31) / 255;
-
-  return (r5 << 11) | (g6 << 5) | b5;
-};
-
-const rgb5652hex = (rgb565) => {
-  // Extract the red, green, and blue components from the 16-bit value
-  let red5 = (rgb565 >> 11) & 0x1f;
-  let green6 = (rgb565 >> 5) & 0x3f;
-  let blue5 = rgb565 & 0x1f;
-
-  // Scale the components back to the 8-bit range (0-255)
-  let red = (red5 << 3) | (red5 >> 2); // Scale 5-bit red to 8-bit
-  let green = (green6 << 2) | (green6 >> 4); // Scale 6-bit green to 8-bit
-  let blue = (blue5 << 3) | (blue5 >> 2); // Scale 5-bit blue to 8-bit
-
-  // Combine the components into a single 3-byte hex color code
-  let hexColor = ((red << 16) | (green << 8) | blue)
-    .toString(16)
-    .padStart(6, '0');
-
-  return `#${hexColor}`;
-};
+// WiFi reset function
+function resetWiFiSettings() {
+  console.log('Reset WiFi button clicked');
+  
+  if (confirm('Are you sure you want to reset WiFi settings? This will restart the device and open the configuration portal.')) {
+    console.log('User confirmed WiFi reset');
+    
+    // Disable button to prevent multiple clicks
+    resetWifiBtn.disabled = true;
+    resetWifiBtn.textContent = '🔄 Resetting...';
+    
+    fetch('/resetwifi', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then((response) => {
+        console.log('Reset WiFi response:', response.status);
+        if (response.ok) {
+          alert('WiFi settings reset. The device will restart and open the configuration portal.');
+          return response.text();
+        } else {
+          throw new Error('Server returned error: ' + response.status);
+        }
+      })
+      .then((text) => {
+        console.log('Reset response text:', text);
+      })
+      .catch((error) => {
+        console.error('Error resetting WiFi:', error);
+        alert('Error resetting WiFi settings: ' + error.message);
+        
+        // Re-enable button on error
+        resetWifiBtn.disabled = false;
+        resetWifiBtn.textContent = '🔄 Reset WiFi Settings';
+      });
+  } else {
+    console.log('User cancelled WiFi reset');
+  }
+}

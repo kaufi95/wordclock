@@ -1,45 +1,46 @@
-body {
-  background-color: azure;
+/* Custom slider styling for range inputs */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
-#color-picker {
-  height: 50px;
-  width: 100px;
-  border: 3px solid lightgray;
-  border-radius: 5px;
+.slider::-webkit-slider-thumb:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-#update-btn {
-  margin-top: 20px;
-  padding: 10px;
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 5px;
+.slider::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
-.form-group {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
+.slider::-moz-range-thumb:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-.form-group label {
-  width: 80px;
-  text-align: end;
-  margin-right: 10px;
-}
-
-.form-group input {
-  flex: 1;
-  border-radius: 3px;
-  border-color: lightgray;
-  border-style: solid;
+/* Remove focus outline on sliders */
+.slider:focus {
+  outline: none;
 }
