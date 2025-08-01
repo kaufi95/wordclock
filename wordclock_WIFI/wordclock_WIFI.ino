@@ -9,27 +9,22 @@
 #include <ESPmDNS.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <NTPClient.h>
 
 #include <FastLED.h>
 
 #include "src/dialekt.h"
 #include "src/deutsch.h"
 
-#include <NTPClient.h>
-
-#define VERSION "3.2"
+#define VERSION "3.5"
 
 // define WiFi params
 #define AP_SSID "WordClock-Setup"
-#define AP_TIMEOUT 600  // seconds
 #define DNS_NAME "wordclock"
-#define HTTP_PORT 80
 
 // define matrix params
-#define MATRIX_WIDTH 11   // width of LED matrix
-#define MATRIX_HEIGHT 10  // height of LED matrix + additional row for minute leds
 #define LED_PIN 4         // define pin for LEDs
-#define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT + 4)
+#define NUM_LEDS 114
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
 
@@ -63,7 +58,7 @@ Preferences preferences;
 WiFiManager wm;
 
 // create webserver
-AsyncWebServer server(HTTP_PORT);
+AsyncWebServer server(80);
 
 // NTP management
 WiFiUDP ntpUDP;
@@ -73,9 +68,9 @@ NTPClient timeClient(ntpUDP);
 CRGB leds[NUM_LEDS];
 
 // define time change rules and timezone
-TimeChangeRule atST = { "ST", Last, Sun, Mar, 2, 120 };  // UTC + 2 hours
-TimeChangeRule atRT = { "RT", Last, Sun, Oct, 3, 60 };   // UTC + 1 hour
-Timezone AT(atST, atRT);
+TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 };  // UTC + 2 hours
+TimeChangeRule CET = { "CET", Last, Sun, Oct, 3, 60 };   // UTC + 1 hour
+Timezone AT(CEST, CET);
 
 void setup() {
   // enable serial output
@@ -123,9 +118,7 @@ void setup() {
 void loop() {
   updateSettings();
   updateTime();
-  displayTime();
   refreshMatrix(false);
-  
   delay(1000);
 }
 
@@ -137,22 +130,6 @@ void updateSettings() {
 
   storeSettings();
   update = false;
-}
-
-void displayTime() {
-  if (!timeSynced) return;
-
-  time_t timeUTC = timeClient.getEpochTime();
-  time_t timeLocal = AT.toLocal(timeUTC);
-
-  // Only display time when minute changes
-  uint8_t currentMin = minute(timeLocal);
-  static uint8_t lastDisplayedMin = 255;
-
-  if (currentMin != lastDisplayedMin) {
-    displayTimeInfo(timeLocal, "Local");
-    lastDisplayedMin = currentMin;
-  }
 }
 
 void updateTime() {
@@ -174,9 +151,9 @@ void updateTime() {
     return;
   }
 
-  time_t time_ntp = timeClient.getEpochTime();
-  displayTimeInfo(time_ntp, "NTP");
   Serial.println("Time synced over NTP.");
+  time_t time = timeClient.getEpochTime();
+  displayTimeInfo(AT.toLocal(time);
   timeSynced = true;
   scheduleNextTimeSync();
 }
@@ -199,16 +176,13 @@ void printSettings() {
 
 void startWiFiConnection() {
   Serial.println("Starting WiFi connection...");
-  //WiFi.setHostname(DNS_NAME);
+  WiFi.setHostname(DNS_NAME);
   
-  // Configure WiFiManager
-  wm.setConfigPortalTimeout(AP_TIMEOUT);
+  wm.setConfigPortalTimeout(600);
   wm.setAPCallback(configModeCallback);
-  wm.setSaveConfigCallback(saveConfigCallback);
   wm.setConnectTimeout(30);
   wm.setDebugOutput(false);
   
-  // Start connection - this will create WiFiManager's internal webserver
   if (!wm.autoConnect(AP_SSID)) {
     Serial.println("Failed to start WiFi connection");
     ESP.restart();
@@ -218,30 +192,13 @@ void startWiFiConnection() {
 }
 
 void onWiFiConnected() {
-  Serial.println("\nWiFi connected successfully!");
+  Serial.println("WiFi connected successfully!");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
-  // Clear display
-  FastLED.clear();
-  FastLED.show();
-
-  // CRITICAL: Properly shutdown WiFiManager's webserver
-  Serial.println("Shutting down WiFiManager webserver...");
-  wm.setConfigPortalBlocking(true);  // Ensure blocking mode
-  wm.stopConfigPortal();             // Stop the config portal and its webserver
-  
-  // Wait for WiFiManager cleanup - ESSENTIAL for resource cleanup
-  Serial.println("Waiting for WiFiManager cleanup...");
-  delay(3000);
-  
-  // Now safe to start our services
-  Serial.println("Starting services...");
+   
   startMDNS();
   startServer();
 }
-
-// WiFi processing functions above
 
 void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println("Entered config mode");
@@ -249,19 +206,15 @@ void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println("SSID: " + String(myWiFiManager->getConfigPortalSSID()));
 }
 
-void saveConfigCallback() {
-  Serial.println("WiFi configuration saved");
-}
-
 void resetWiFiSettings() {
-  Serial.println("Resetting WiFi settings...");
-  wm.resetSettings();
+  Serial.println("Resetting WiFi settings and rebooting...");
   delay(1000);
+  wm.resetSettings();
   ESP.restart();
 }
 
 // ------------------------------------------------------------
-// mdns
+// services
 
 void startMDNS() {
   while (!MDNS.begin(DNS_NAME)) {
@@ -270,6 +223,12 @@ void startMDNS() {
   }
   MDNS.addService("http", "tcp", 80);
   Serial.println("mDNS responder started");
+}
+
+void startNTP() {
+  timeClient.begin();
+  nextTimeSync = 0;
+  Serial.println("NTP client started");
 }
 
 // ------------------------------------------------------------
@@ -297,17 +256,7 @@ void startServer() {
 
   // Start server
   server.begin();
-  Serial.println("AsyncWebServer started");
-}
-
-void startNTP() {
-  // Initialize NTP client after WiFi is stable
-  timeClient.begin();
-  Serial.println("NTP client started");
-  
-  // Force initial time sync
-  nextTimeSync = 0;
-  Serial.println("NTP client started");
+  Serial.println("WebServer started");
 }
 
 void handleNotFound(AsyncWebServerRequest *request) {
@@ -367,8 +316,6 @@ void handleResetWiFi(AsyncWebServerRequest *request) {
   resetWiFiSettings();
 }
 
-// File handlers removed - using AsyncWebServer serveStatic instead
-
 // ------------------------------------------------------------
 // storage
 
@@ -404,7 +351,6 @@ void storeSettings() {
 // ------------------------------------------------------------
 // wordclock logic
 
-// clears, generates and fills pixels
 void refreshMatrix(bool settingsChanged) {
   if (!timeSynced) return;
 
@@ -418,7 +364,6 @@ void refreshMatrix(bool settingsChanged) {
   }
 }
 
-// converts time directly to LED array
 void setPixels(time_t time) {
   if (config.language == "dialekt") {
     dialekt::timeToLeds(time, leds, config.red, config.green, config.blue);
@@ -429,17 +374,15 @@ void setPixels(time_t time) {
 }
 
 // ------------------------------------------------------------
-// serial output
-
 // display time information in readable format
-void displayTimeInfo(time_t t, String component) {
+
+void displayTimeInfo(time_t t) {
   // Get weekday name
   String weekdays[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
   String months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-  Serial.print("┌─ " + component + " Time ─────────────────────────────────");
-  Serial.println();
+  Serial.println("┌─ Local Time ───────────────────────────────────");
 
   // Print date with weekday
   Serial.print("│ Date: ");
@@ -463,22 +406,6 @@ void displayTimeInfo(time_t t, String component) {
   Serial.print(":");
   if (second(t) < 10) Serial.print("0");
   Serial.print(second(t));
-
-  // Add 12h format for reference
-  Serial.print(" (");
-  int h12 = hour(t);
-  String ampm = "AM";
-  if (h12 == 0) h12 = 12;
-  else if (h12 > 12) {
-    h12 -= 12;
-    ampm = "PM";
-  } else if (h12 == 12) ampm = "PM";
-
-  Serial.print(h12);
-  Serial.print(":");
-  if (minute(t) < 10) Serial.print("0");
-  Serial.print(minute(t));
-  Serial.print(" " + ampm + ")");
   Serial.println();
 
   Serial.println("└────────────────────────────────────────────────");
