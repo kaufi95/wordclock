@@ -84,7 +84,6 @@ resetWifiBtn.addEventListener('click', resetWiFiSettings);
 
 document.addEventListener('DOMContentLoaded', () => {
   onLoad();
-  updateColorFromSliders(); // Initialize color display
 });
 
 function updateUI(data) {
@@ -94,9 +93,9 @@ function updateUI(data) {
 }
 
 function updateColor(red, green, blue) {
-  redSlider.value = red || 255;
-  greenSlider.value = green || 255;
-  blueSlider.value = blue || 255;
+  redSlider.value = red;
+  greenSlider.value = green;
+  blueSlider.value = blue;
   updateColorFromSliders();
 }
 
@@ -138,7 +137,7 @@ function getSelectedBrightness() {
 }
 
 function onLoad() {
-  fetch('http://' + window.location.host + '/status')
+  fetch('/status')
     .then((response) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -166,7 +165,7 @@ function sendUpdateRequest() {
     brightness: brightness
   };
 
-  fetch('http://' + window.location.host + '/update', {
+  fetch('/update', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -188,14 +187,18 @@ function sendUpdateRequest() {
 // WiFi reset function
 function resetWiFiSettings() {
   console.log('Reset WiFi button clicked');
-  
-  if (confirm('Are you sure you want to reset WiFi settings? This will restart the device and open the configuration portal.')) {
+
+  if (
+    confirm(
+      'Are you sure you want to reset WiFi settings? This will restart the device and open the configuration portal.'
+    )
+  ) {
     console.log('User confirmed WiFi reset');
-    
+
     // Disable button to prevent multiple clicks
     resetWifiBtn.disabled = true;
     resetWifiBtn.textContent = '🔄 Resetting...';
-    
+
     fetch('/resetwifi', {
       method: 'POST',
       headers: {
@@ -205,7 +208,9 @@ function resetWiFiSettings() {
       .then((response) => {
         console.log('Reset WiFi response:', response.status);
         if (response.ok) {
-          alert('WiFi settings reset. The device will restart and open the configuration portal.');
+          alert(
+            'WiFi settings reset. The device will restart and open the configuration portal.'
+          );
           return response.text();
         } else {
           throw new Error('Server returned error: ' + response.status);
@@ -217,7 +222,7 @@ function resetWiFiSettings() {
       .catch((error) => {
         console.error('Error resetting WiFi:', error);
         alert('Error resetting WiFi settings: ' + error.message);
-        
+
         // Re-enable button on error
         resetWifiBtn.disabled = false;
         resetWifiBtn.textContent = '🔄 Reset WiFi Settings';
