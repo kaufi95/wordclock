@@ -14,9 +14,25 @@ E L F Z E H N E U H R
 
 */
 
+/*
+
+  0   1   2   3   4   5   6   7   8   9  10
+ 21  20  19  18  17  16  15  14  13  12  11
+ 22  23  24  25  26  27  28  29  30  31  32
+ 43  42  41  40  39  38  37  36  35  34  33
+ 44  45  46  47  48  49  50  51  52  53  54
+ 65  64  63  62  61  60  59  58  57  56  55
+ 66  67  68  69  70  71  72  73  74  75  76
+ 87  86  85  84  83  82  81  80  79  78  77
+ 88  89  90  91  92  93  94  95  96  97  98
+109 108 107 106 105 104 103 102 101 100  99
+              110 111 112 113
+
+*/
+
 #include <Arduino.h>
 #include <TimeLib.h>
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
 #include "matrixUtils.h"
 
 namespace deutsch
@@ -42,27 +58,27 @@ namespace deutsch
     void half();
     void uhr();
 
-    CRGB *leds;
+    Adafruit_NeoPixel *strip;
     uint8_t red, green, blue;
 
     // converts time directly to LED array
-    void timeToLeds(time_t time, CRGB* _leds, uint8_t _red, uint8_t _green, uint8_t _blue)
+    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue)
     {
-        leds = _leds;
+        strip = _strip;
         red = _red;
         green = _green;
         blue = _blue;
-        
+
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
 
-        // show "Es ist" 
+        // show "Es ist"
         if (showEsIst(minutes))
         {
             // Es ist
             Serial.print("Es ist ");
-            turnLedsOn(1, 2, leds, red, green, blue);    // "ES" - LEDs 1-2
-            turnLedsOn(5, 7, leds, red, green, blue);    // "IST" - LEDs 5-7
+            turnLedsOn(1, 2, strip, red, green, blue); // "ES" - LEDs 1-2
+            turnLedsOn(5, 7, strip, red, green, blue); // "IST" - LEDs 5-7
         }
 
         // show minutes
@@ -219,8 +235,9 @@ namespace deutsch
         }
 
         // Show minute dots (LEDs 110-113)
-        for (uint8_t i = 0; i < (minutes % 5); i++) {
-            leds[110 + i] = CRGB(red, green, blue);
+        for (uint8_t i = 0; i < (minutes % 5); i++)
+        {
+            strip->setPixelColor(110 + i, strip->Color(red, green, blue));
         }
 
         Serial.print(" + ");
@@ -234,151 +251,132 @@ namespace deutsch
 
     void hour_one(bool s)
     {
-        // oans/eins
         if (s)
         {
             Serial.print("eins");
-            turnLedsOn(47, 50, leds, red, green, blue);  // "EINS" - row 4, cols 7-10
+            turnLedsOn(51, 54, strip, red, green, blue);
         }
         else
         {
             Serial.print("ein");
-            turnLedsOn(47, 49, leds, red, green, blue);  // "EIN" - row 4, cols 7-9
+            turnLedsOn(51, 53, strip, red, green, blue);
         }
     }
 
     void hour_two()
     {
-        // zwoa/zwei
         Serial.print("zwei");
-        turnLedsOn(45, 48, leds, red, green, blue);  // "ZWEI" - row 4, cols 5-8
+        turnLedsOn(49, 52, strip, red, green, blue);
     }
 
     void hour_three()
     {
-        // drei
         Serial.print("drei");
-        turnLedsOn(55, 58, leds, red, green, blue);  // "DREI" - row 5, cols 0-3
+        turnLedsOn(62, 65, strip, red, green, blue);
     }
 
     void hour_four()
     {
-        // vier/e/vier
         Serial.print("vier");
-        turnLedsOn(80, 83, leds, red, green, blue);  // "VIER" - row 8, cols 0-3
+        turnLedsOn(88, 91, strip, red, green, blue);
     }
 
     void hour_five()
     {
-        // fünfe/fünf
         Serial.print("fünf");
-        turnLedsOn(77, 80, leds, red, green, blue);  // "FÜNF" - row 7, cols 0-3
+        turnLedsOn(84, 87, strip, red, green, blue);
     }
 
     void min_five()
     {
-        // fünf/fünf
         Serial.print("fünf");
-        turnLedsOn(11, 14, leds, red, green, blue);  // "FÜNF" - row 1, cols 0-3
+        turnLedsOn(18, 21, strip, red, green, blue);
     }
 
     void hour_six()
     {
-        // sechse/sechs
         Serial.print("sechs");
-        turnLedsOn(60, 64, leds, red, green, blue);  // "SECHS" - row 5, cols 5-9
+        turnLedsOn(56, 60, strip, red, green, blue);
     }
 
     void hour_seven()
     {
-        // siebne/sieben
         Serial.print("sieben");
-        turnLedsOn(66, 71, leds, red, green, blue);  // "SIEBEN" - row 6, cols 0-5
+        turnLedsOn(66, 71, strip, red, green, blue);
     }
 
     void hour_eight()
     {
-        // achte/acht
         Serial.print("acht");
-        turnLedsOn(72, 75, leds, red, green, blue);  // "ACHT" - row 7, cols 6-9
+        turnLedsOn(78, 81, strip, red, green, blue);
     }
 
     void hour_nine()
     {
-        // nüne/neun
         Serial.print("neun");
-        turnLedsOn(73, 76, leds, red, green, blue);  // "NEUN" - row 6, cols 7-10
+        turnLedsOn(73, 76, strip, red, green, blue);
     }
 
     void hour_ten()
     {
-        // zehne/zehn
         Serial.print("zehn");
-        turnLedsOn(103, 106, leds, red, green, blue);  // "ZEHN" - row 9, cols 3-6
+        turnLedsOn(103, 106, strip, red, green, blue);
     }
 
     void min_ten()
     {
-        // zehn/zehn
         Serial.print("zehn");
-        turnLedsOn(18, 21, leds, red, green, blue);  // "ZEHN" - row 2, cols 7-10
+        turnLedsOn(29, 32, strip, red, green, blue);
     }
 
     void hour_eleven()
     {
-        // elfe/elf
         Serial.print("elf");
-        turnLedsOn(99, 101, leds, red, green, blue);  // "ELF" - row 9, cols 0-2
+        turnLedsOn(107, 109, strip, red, green, blue);
     }
 
     void hour_twelve()
     {
-        // zwölfe/zwölf
         Serial.print("zwölf");
-        turnLedsOn(84, 88, leds, red, green, blue);  // "ZWÖLF" - row 8, cols 5-9
+        turnLedsOn(93, 97, strip, red, green, blue);
     }
 
     void quarter()
     {
-        // viertel
         Serial.print("viertel");
-        turnLedsOn(22, 28, leds, red, green, blue);  // "VIERTEL" - row 2, cols 0-6
+        turnLedsOn(22, 28, strip, red, green, blue);
     }
 
     void twenty()
     {
-        // zwanzig
         Serial.print("zwanzig");
-        turnLedsOn(15, 21, leds, red, green, blue);  // "ZWANZIG" - row 1, cols 4-10
+        turnLedsOn(11, 17, strip, red, green, blue);
     }
 
     // ------------------------------------------------------------
 
     void to()
     {
-        // vor/vor
         Serial.print("vor");
-        turnLedsOn(34, 36, leds, red, green, blue);  // "VOR" - row 3, cols 1-3
+        turnLedsOn(40, 42, strip, red, green, blue);
     }
 
     void after()
     {
-        // noch/nach
         Serial.print("nach");
-        turnLedsOn(38, 41, leds, red, green, blue);  // "NACH" - row 3, cols 5-8
+        turnLedsOn(35, 38, strip, red, green, blue);
     }
 
     void half()
     {
-        // halb
         Serial.print("halb");
-        turnLedsOn(44, 47, leds, red, green, blue);  // "HALB" - row 4, cols 0-3
+        turnLedsOn(44, 47, strip, red, green, blue);
     }
 
     void uhr()
     {
         Serial.print(" uhr");
-        turnLedsOn(107, 109, leds, red, green, blue);  // "UHR" - row 9, cols 8-10
+        turnLedsOn(99, 102, strip, red, green, blue);
     }
 
 } // namespace deutsch

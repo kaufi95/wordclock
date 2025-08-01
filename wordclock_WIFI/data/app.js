@@ -40,9 +40,9 @@ function updateColorFromSliders(sendUpdate = false) {
 
 function updateSlidersFromColor() {
   const hex = colorPicker.value;
-  const r = parseInt(hex.substr(1, 2), 16);
-  const g = parseInt(hex.substr(3, 2), 16);
-  const b = parseInt(hex.substr(5, 2), 16);
+  const r = Math.max(0, Math.min(255, parseInt(hex.substring(1, 3), 16) || 0));
+  const g = Math.max(0, Math.min(255, parseInt(hex.substring(3, 5), 16) || 0));
+  const b = Math.max(0, Math.min(255, parseInt(hex.substring(5, 7), 16) || 0));
 
   redSlider.value = r;
   greenSlider.value = g;

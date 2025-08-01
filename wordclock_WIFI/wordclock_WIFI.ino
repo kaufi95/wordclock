@@ -11,7 +11,9 @@
 #include <ESPAsyncWebServer.h>
 #include <NTPClient.h>
 
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
+
+#include <ESP32Time.h>
 
 #include "src/dialekt.h"
 #include "src/deutsch.h"
@@ -25,8 +27,6 @@
 // define matrix params
 #define LED_PIN 4         // define pin for LEDs
 #define NUM_LEDS 114
-#define LED_TYPE WS2812B
-#define COLOR_ORDER GRB
 
 // define preferences namespace
 #define PREFS_NAMESPACE "wordclock"
@@ -43,7 +43,6 @@ struct Config {
 Config config = { 255, 255, 255, 128, "dialekt" };  // white color by default
 
 uint8_t lastMin;
-bool timeSynced = false;
 bool update = false;
 bool wifiConnected = false;
 
@@ -64,8 +63,11 @@ AsyncWebServer server(80);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
-// create FastLED array
-CRGB leds[NUM_LEDS];
+// RTC management
+ESP32Time rtc;
+
+// create NeoPixel strip
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // define time change rules and timezone
 TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 };  // UTC + 2 hours
@@ -73,30 +75,39 @@ TimeChangeRule CET = { "CET", Last, Sun, Oct, 3, 60 };   // UTC + 1 hour
 Timezone AT(CEST, CET);
 
 void setup() {
-  // enable serial output
   Serial.begin(115200);
-  Serial.println("WordClock");
-  Serial.println("v" + String(VERSION));
+  Serial.print("WordClock");
+  Serial.println(" v" + String(VERSION));
   Serial.println("by kaufi95");
 
   while (!LittleFS.begin(true)) {
     Serial.println("File system mount failed...");
     ESP.restart();
   }
-  Serial.println("File system mounted");
 
-  // load stored values from preferences
-  Serial.println("Loading settings from preferences");
   loadSettings();
 
-  Serial.println("initiating matrix");
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(config.brightness);
-  FastLED.clear();
-  FastLED.show();
+  strip.begin();
+  strip.setBrightness(config.brightness);
+  strip.clear();
+  strip.show();
 
-  // Start WiFi connection
-  startWiFiConnection();
+  Serial.println("Initializing RTC");
+  rtc.setTime(2, 0, 0, 1, 1, 2025);
+
+  Serial.println("Starting WiFi connection...");
+  WiFi.setHostname(DNS_NAME);
+  wm.setConfigPortalTimeout(600);
+  wm.setAPCallback(configModeCallback);
+  wm.setConnectTimeout(30);
+  wm.setDebugOutput(false);
+  
+  if (!wm.autoConnect(AP_SSID)) {
+    Serial.println("Failed to start WiFi connection");
+    ESP.restart();
+  }
+  
+  Serial.println("WiFiManager connection process completed");
   
   // Wait for WiFi connection
   Serial.println("Waiting for WiFi connection...");
@@ -108,7 +119,6 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     wifiConnected = true;
     onWiFiConnected();
-    startNTP();
   }
 }
 
@@ -116,32 +126,20 @@ void setup() {
 // main
 
 void loop() {
-  updateSettings();
   updateTime();
-  refreshMatrix(false);
+  refreshMatrix(update);
+  updateSettings();
   delay(1000);
 }
 
 void updateSettings() {
   if (!update) return;
-
-  FastLED.setBrightness(config.brightness);
-  refreshMatrix(true);
-
   storeSettings();
   update = false;
 }
 
 void updateTime() {
-  if (!wifiConnected) {
-    return;
-  }
-
-  if (millis() >= nextTimeSync) {
-    timeSynced = false;
-  }
-
-  if (timeSynced) {
+  if (!wifiConnected || millis() < nextTimeSync) {
     return;
   }
 
@@ -150,11 +148,15 @@ void updateTime() {
     Serial.println("TimeClient not ready yet...");
     return;
   }
-
+  
   Serial.println("Time synced over NTP.");
   time_t time = timeClient.getEpochTime();
-  displayTimeInfo(AT.toLocal(time);
-  timeSynced = true;
+  
+  // Update RTC with NTP time
+  rtc.setTime(time);
+  Serial.println("RTC synchronized with NTP time");
+  
+  displayTimeInfo(AT.toLocal(time));
   scheduleNextTimeSync();
 }
 
@@ -174,28 +176,12 @@ void printSettings() {
 // ------------------------------------------------------------
 // wifi
 
-void startWiFiConnection() {
-  Serial.println("Starting WiFi connection...");
-  WiFi.setHostname(DNS_NAME);
-  
-  wm.setConfigPortalTimeout(600);
-  wm.setAPCallback(configModeCallback);
-  wm.setConnectTimeout(30);
-  wm.setDebugOutput(false);
-  
-  if (!wm.autoConnect(AP_SSID)) {
-    Serial.println("Failed to start WiFi connection");
-    ESP.restart();
-  }
-  
-  Serial.println("WiFiManager connection process completed");
-}
-
 void onWiFiConnected() {
   Serial.println("WiFi connected successfully!");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
    
+  startNTP();
   startMDNS();
   startServer();
 }
@@ -216,27 +202,19 @@ void resetWiFiSettings() {
 // ------------------------------------------------------------
 // services
 
-void startMDNS() {
-  while (!MDNS.begin(DNS_NAME)) {
-    Serial.println("mDNS responder not started yet...");
-    delay(1000);
-  }
-  MDNS.addService("http", "tcp", 80);
-  Serial.println("mDNS responder started");
-}
-
 void startNTP() {
   timeClient.begin();
   nextTimeSync = 0;
   Serial.println("NTP client started");
 }
 
-// ------------------------------------------------------------
-// webserver
+void startMDNS() {
+  MDNS.begin(DNS_NAME);
+  MDNS.addService("http", "tcp", 80);
+  Serial.println("mDNS responder started");
+}
 
 void startServer() {
-  Serial.println("Starting AsyncWebServer...");
-
   // Configure server with minimal handlers first
   server.onNotFound(handleNotFound);
   server.on("/", HTTP_GET, handleConnect);
@@ -245,7 +223,9 @@ void startServer() {
 
   server.onRequestBody([](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     if (request->url() == "/update") {
-      handleUpdate(request, data);
+      if (index + len == total) {
+        handleUpdate(request, data, len);
+      }
     }
   });
 
@@ -284,9 +264,15 @@ void handleStatus(AsyncWebServerRequest *request) {
   request->send(200, "application/json", response);
 }
 
-void handleUpdate(AsyncWebServerRequest *request, uint8_t *data) {
+void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
+  String jsonString;
+  jsonString.reserve(len + 1);
+  for (size_t i = 0; i < len; i++) {
+    jsonString += (char)data[i];
+  }
+
   JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, data);
+  DeserializationError error = deserializeJson(doc, jsonString);
 
   if (error) {
     Serial.println("Failed to deserialize json from update-request.");
@@ -330,6 +316,7 @@ void loadSettings() {
 
   preferences.end();
 
+  Serial.println("Settings loaded from preferences");
   printSettings();
 }
 
@@ -352,24 +339,24 @@ void storeSettings() {
 // wordclock logic
 
 void refreshMatrix(bool settingsChanged) {
-  if (!timeSynced) return;
-
-  time_t timeUTC = timeClient.getEpochTime();
+  time_t timeUTC = rtc.getEpoch();
   time_t time = AT.toLocal(timeUTC);
+  
   if (lastMin != minute(time) || settingsChanged) {
-    FastLED.clear();
+    strip.setBrightness(config.brightness);
+    strip.clear();
     setPixels(time);
-    FastLED.show();
+    strip.show();
     lastMin = minute(time);
   }
 }
 
 void setPixels(time_t time) {
   if (config.language == "dialekt") {
-    dialekt::timeToLeds(time, leds, config.red, config.green, config.blue);
+    dialekt::timeToLeds(time, &strip, config.red, config.green, config.blue);
   }
   if (config.language == "deutsch") {
-    deutsch::timeToLeds(time, leds, config.red, config.green, config.blue);
+    deutsch::timeToLeds(time, &strip, config.red, config.green, config.blue);
   }
 }
 
