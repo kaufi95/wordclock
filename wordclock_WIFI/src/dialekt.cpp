@@ -14,9 +14,25 @@ E L F E I Z W Ö L F E
 
 */
 
+/*
+
+  0   1   2   3   4   5   6   7   8   9  10
+ 21  20  19  18  17  16  15  14  13  12  11
+ 22  23  24  25  26  27  28  29  30  31  32
+ 43  42  41  40  39  38  37  36  35  34  33
+ 44  45  46  47  48  49  50  51  52  53  54
+ 65  64  63  62  61  60  59  58  57  56  55
+ 66  67  68  69  70  71  72  73  74  75  76
+ 87  86  85  84  83  82  81  80  79  78  77
+ 88  89  90  91  92  93  94  95  96  97  98
+109 108 107 106 105 104 103 102 101 100  99
+              110 111 112 113
+
+*/
+
 #include <Arduino.h>
 #include <TimeLib.h>
-#include <array>
+#include <Adafruit_NeoPixel.h>
 #include "matrixUtils.h"
 
 namespace dialekt
@@ -41,12 +57,17 @@ namespace dialekt
     void after();
     void half();
 
-    std::array<std::array<bool, 11>, 11> *matrix;
+    Adafruit_NeoPixel *strip;
+    uint8_t red, green, blue;
 
-    // converts time into matrix
-    void timeToPixels(time_t time, std::array<std::array<bool, 11>, 11> &_matrix)
+    // converts time directly to LED array
+    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue)
     {
-        matrix = &_matrix;
+        strip = _strip;
+        red = _red;
+        green = _green;
+        blue = _blue;
+
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
 
@@ -54,8 +75,8 @@ namespace dialekt
         if (showEsIst(minutes))
         {
             Serial.print("Es isch ");
-            turnPixelsOn(1, 2, 0, *matrix);
-            turnPixelsOn(5, 8, 0, *matrix);
+            turnLedsOn(1, 2, strip, red, green, blue); // "ES" - LEDs 1-2
+            turnLedsOn(5, 8, strip, red, green, blue); // "ISCH" - LEDs 5-8
         }
 
         // show minutes
@@ -199,7 +220,11 @@ namespace dialekt
             break;
         }
 
-        turnPixelsOnMinutes(0, minutes % 5, 10, *matrix);
+        // Show minute dots (LEDs 110-113)
+        for (uint8_t i = 0; i < (minutes % 5); i++)
+        {
+            strip->setPixelColor(110 + i, strip->Color(red, green, blue));
+        }
 
         Serial.print(" + ");
         Serial.print(minutes % 5);
@@ -212,137 +237,118 @@ namespace dialekt
 
     void hour_one()
     {
-        // oans/eins
         Serial.print("oans");
-        turnPixelsOn(7, 10, 4, *matrix);
+        turnLedsOn(51, 54, strip, red, green, blue);
     }
 
     void hour_two()
     {
-        // zwoa/zwei
         Serial.print("zwoa");
-        turnPixelsOn(5, 8, 4, *matrix);
+        turnLedsOn(49, 52, strip, red, green, blue);
     }
 
     void hour_three()
     {
-        // drei
         Serial.print("drei");
-        turnPixelsOn(0, 3, 5, *matrix);
+        turnLedsOn(62, 65, strip, red, green, blue);
     }
 
     void hour_four()
     {
-        // vier/e/vier
         Serial.print("viere");
-        turnPixelsOn(0, 4, 8, *matrix);
+        turnLedsOn(88, 92, strip, red, green, blue);
     }
 
     void hour_five()
     {
-        // fünfe/fünf
         Serial.print("fünfe");
-        turnPixelsOn(0, 4, 7, *matrix);
+        turnLedsOn(83, 87, strip, red, green, blue);
     }
 
     void min_five()
     {
-        // fünf/fünf
         Serial.print("fünf");
-        turnPixelsOn(0, 3, 1, *matrix);
+        turnLedsOn(18, 21, strip, red, green, blue);
     }
 
     void hour_six()
     {
-        // sechse/sechs
         Serial.print("sechse");
-        turnPixelsOn(5, 10, 5, *matrix);
+        turnLedsOn(55, 60, strip, red, green, blue);
     }
 
     void hour_seven()
     {
-        // siebne/sieben
         Serial.print("siebne");
-        turnPixelsOn(0, 5, 6, *matrix);
+        turnLedsOn(66, 71, strip, red, green, blue);
     }
 
     void hour_eight()
     {
-        // achte/acht
         Serial.print("achte");
-        turnPixelsOn(6, 10, 7, *matrix);
+        turnLedsOn(77, 81, strip, red, green, blue);
     }
 
     void hour_nine()
     {
-        // nüne/neun
         Serial.print("nüne");
-        turnPixelsOn(7, 10, 6, *matrix);
+        turnLedsOn(73, 76, strip, red, green, blue);
     }
 
     void hour_ten()
     {
-        // zehne/zehn
         Serial.print("zehne");
-        turnPixelsOn(6, 10, 8, *matrix);
+        turnLedsOn(94, 98, strip, red, green, blue);
     }
 
     void min_ten()
     {
-        // zehn/zehn
         Serial.print("zehn");
-        turnPixelsOn(7, 10, 2, *matrix);
+        turnLedsOn(29, 32, strip, red, green, blue);
     }
 
     void hour_eleven()
     {
-        // elfe/elf
         Serial.print("elfe");
-        turnPixelsOn(0, 3, 9, *matrix);
+        turnLedsOn(106, 109, strip, red, green, blue);
     }
 
     void hour_twelve()
     {
-        // zwölfe/zwölf
         Serial.print("zwölfe");
-        turnPixelsOn(5, 10, 9, *matrix);
+        turnLedsOn(99, 104, strip, red, green, blue);
     }
 
     void quarter()
     {
-        // viertel
         Serial.print("viertel");
-        turnPixelsOn(0, 6, 2, *matrix);
+        turnLedsOn(22, 28, strip, red, green, blue);
     }
 
     void twenty()
     {
-        // zwanzig
         Serial.print("zwanzig");
-        turnPixelsOn(4, 10, 1, *matrix);
+        turnLedsOn(11, 17, strip, red, green, blue);
     }
 
     // ------------------------------------------------------------
 
     void to()
     {
-        // vor/vor
         Serial.print("vor");
-        turnPixelsOn(1, 3, 3, *matrix);
+        turnLedsOn(40, 42, strip, red, green, blue);
     }
 
     void after()
     {
-        // noch/nach
         Serial.print("noch");
-        turnPixelsOn(5, 8, 3, *matrix);
+        turnLedsOn(35, 38, strip, red, green, blue);
     }
 
     void half()
     {
-        // halb
         Serial.print("halb");
-        turnPixelsOn(0, 3, 4, *matrix);
+        turnLedsOn(44, 47, strip, red, green, blue);
     }
 
 } // namespace dialekt
