@@ -37,10 +37,11 @@ struct Config {
   uint8_t blue;        // blue component (0-255)
   uint8_t brightness;  // brightness
   String language;     // language
+  bool enabled;        // wordclock on/off state
 };
 
 // create config object and set default values
-Config config = { 255, 255, 255, 128, "dialekt" };  // white color by default
+Config config = { 255, 255, 255, 128, "dialekt", true };  // white color, enabled by default
 
 uint8_t lastMin;
 bool update = false;
@@ -171,6 +172,7 @@ void printSettings() {
   Serial.println("Blue:\t\t" + String(config.blue));
   Serial.println("Brightness:\t" + String(config.brightness));
   Serial.println("Language:\t" + config.language);
+  Serial.println("Enabled:\t" + String(config.enabled));
 }
 
 // ------------------------------------------------------------
@@ -255,6 +257,7 @@ void handleStatus(AsyncWebServerRequest *request) {
   doc["blue"] = config.blue;
   doc["brightness"] = config.brightness;
   doc["language"] = config.language;
+  doc["enabled"] = config.enabled;
 
   String response;
   if (!serializeJson(doc, response)) {
@@ -281,11 +284,24 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
     return;
   }
 
-  config.red = (uint8_t)doc["red"];
-  config.green = (uint8_t)doc["green"];
-  config.blue = (uint8_t)doc["blue"];
-  config.brightness = (uint8_t)doc["brightness"];
-  config.language = String(doc["language"]);
+  if (doc.containsKey("red")) {
+    config.red = (uint8_t)doc["red"];
+  }
+  if (doc.containsKey("green")) {
+    config.green = (uint8_t)doc["green"];
+  }
+  if (doc.containsKey("blue")) {
+    config.blue = (uint8_t)doc["blue"];
+  }
+  if (doc.containsKey("brightness")) {
+    config.brightness = (uint8_t)doc["brightness"];
+  }
+  if (doc.containsKey("language")) {
+    config.language = String(doc["language"]);
+  }
+  if (doc.containsKey("enabled")) {
+    config.enabled = doc["enabled"];
+  }
 
   update = true;
 
@@ -313,6 +329,7 @@ void loadSettings() {
   config.blue = preferences.getUChar("blue", 255);
   config.brightness = preferences.getUChar("brightness", 128);
   config.language = preferences.getString("language", "dialekt");
+  config.enabled = preferences.getBool("enabled", true);
 
   preferences.end();
 
@@ -328,6 +345,7 @@ void storeSettings() {
   preferences.putUChar("blue", config.blue);
   preferences.putUChar("brightness", config.brightness);
   preferences.putString("language", config.language);
+  preferences.putBool("enabled", config.enabled);
 
   preferences.end();
 
@@ -339,9 +357,15 @@ void storeSettings() {
 // wordclock logic
 
 void refreshMatrix(bool settingsChanged) {
+  if (!config.enabled) {
+    strip.clear();
+    strip.show();
+    return;
+  }
+
   time_t timeUTC = rtc.getEpoch();
   time_t time = AT.toLocal(timeUTC);
-  
+
   if (lastMin != minute(time) || settingsChanged) {
     strip.setBrightness(config.brightness);
     strip.clear();

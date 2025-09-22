@@ -14,6 +14,12 @@ const languageButtons = document.querySelectorAll('input[name="language"]');
 const brightnessSlider = document.getElementById('brightness-slider');
 const brightnessValue = document.getElementById('brightness-value');
 
+const powerToggle = document.getElementById('power-toggle');
+
+const colorModeToggle = document.getElementById('color-mode-toggle');
+const colorPickerSection = document.getElementById('color-picker-section');
+const colorSlidersSection = document.getElementById('color-sliders-section');
+
 // WiFi reset button
 const resetWifiBtn = document.getElementById('reset-wifi-btn');
 
@@ -79,10 +85,22 @@ languageButtons.forEach((button) => {
   button.addEventListener('change', sendUpdateRequest);
 });
 
+// Power toggle event listener
+powerToggle.addEventListener('change', sendUpdateRequest);
+
+// Color mode toggle event listener
+colorModeToggle.addEventListener('change', () => {
+  setColorMode(colorModeToggle.checked);
+});
+
 // WiFi reset button event listener
 resetWifiBtn.addEventListener('click', resetWiFiSettings);
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Load saved color mode preference
+  const useSliders = loadColorMode();
+  setColorMode(useSliders);
+
   onLoad();
 });
 
@@ -90,6 +108,7 @@ function updateUI(data) {
   updateColor(data.red, data.green, data.blue);
   updateLanguage(data.language);
   updateBrightness(data.brightness);
+  updatePowerToggle(data.enabled);
 }
 
 function updateColor(red, green, blue) {
@@ -110,6 +129,32 @@ function updateLanguage(language) {
 function updateBrightness(brightness) {
   brightnessSlider.value = brightness || 128;
   brightnessValue.textContent = brightness || 128;
+}
+
+function updatePowerToggle(enabled) {
+  powerToggle.checked = enabled !== undefined ? enabled : true;
+}
+
+// Color mode functions
+function saveColorMode(useSliders) {
+  localStorage.setItem('wordclock-color-mode', useSliders ? 'sliders' : 'picker');
+}
+
+function loadColorMode() {
+  const saved = localStorage.getItem('wordclock-color-mode');
+  return saved === 'sliders';
+}
+
+function setColorMode(useSliders) {
+  colorModeToggle.checked = useSliders;
+  if (useSliders) {
+    colorPickerSection.style.display = 'none';
+    colorSlidersSection.style.display = 'block';
+  } else {
+    colorPickerSection.style.display = 'block';
+    colorSlidersSection.style.display = 'none';
+  }
+  saveColorMode(useSliders);
 }
 
 // WiFi status functions removed
@@ -156,13 +201,15 @@ function sendUpdateRequest() {
   const rgb = getSelectedRGB();
   const language = getSelectedLanguage();
   const brightness = getSelectedBrightness();
+  const enabled = powerToggle.checked;
 
   const body = {
     red: rgb.red,
     green: rgb.green,
     blue: rgb.blue,
     language: language,
-    brightness: brightness
+    brightness: brightness,
+    enabled: enabled
   };
 
   fetch('/update', {
