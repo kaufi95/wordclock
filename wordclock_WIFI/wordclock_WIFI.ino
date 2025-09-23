@@ -213,6 +213,7 @@ void startNTP() {
 void startMDNS() {
   MDNS.begin(DNS_NAME);
   MDNS.addService("http", "tcp", 80);
+  MDNS.addService("wordclock", "tcp", 80);
   Serial.println("mDNS responder started");
 }
 
