@@ -376,7 +376,7 @@ namespace deutsch
     void uhr()
     {
         Serial.print(" uhr");
-        turnLedsOn(99, 102, strip, red, green, blue);
+        turnLedsOn(99, 101, strip, red, green, blue);
     }
 
 } // namespace deutsch
