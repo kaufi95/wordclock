@@ -1,27 +1,34 @@
 // UI Elements
-const colorPicker = document.getElementById('color-picker');
+const colorPicker = document.getElementById("color-picker");
 
-const redSlider = document.getElementById('red-slider');
-const greenSlider = document.getElementById('green-slider');
-const blueSlider = document.getElementById('blue-slider');
+const redSlider = document.getElementById("red-slider");
+const greenSlider = document.getElementById("green-slider");
+const blueSlider = document.getElementById("blue-slider");
 
-const redValue = document.getElementById('red-value');
-const greenValue = document.getElementById('green-value');
-const blueValue = document.getElementById('blue-value');
+const redValue = document.getElementById("red-value");
+const greenValue = document.getElementById("green-value");
+const blueValue = document.getElementById("blue-value");
 
 const languageButtons = document.querySelectorAll('input[name="language"]');
+const prefixModeButtons = document.querySelectorAll('input[name="prefixMode"]');
+const transitionButtons = document.querySelectorAll(".btn-transition");
 
-const brightnessSlider = document.getElementById('brightness-slider');
-const brightnessValue = document.getElementById('brightness-value');
+const brightnessSlider = document.getElementById("brightness-slider");
+const brightnessValue = document.getElementById("brightness-value");
 
-const powerToggle = document.getElementById('power-toggle');
+const transitionSpeedSlider = document.getElementById(
+  "transition-speed-slider"
+);
+const transitionSpeedValue = document.getElementById("transition-speed-value");
 
-const colorModeToggle = document.getElementById('color-mode-toggle');
-const colorPickerSection = document.getElementById('color-picker-section');
-const colorSlidersSection = document.getElementById('color-sliders-section');
+const powerToggle = document.getElementById("power-toggle");
+
+const colorModeToggle = document.getElementById("color-mode-toggle");
+const colorPickerSection = document.getElementById("color-picker-section");
+const colorSlidersSection = document.getElementById("color-sliders-section");
 
 // WiFi reset button
-const resetWifiBtn = document.getElementById('reset-wifi-btn');
+const resetWifiBtn = document.getElementById("reset-wifi-btn");
 
 // Color synchronization between picker and sliders
 function updateColorFromSliders(sendUpdate = false) {
@@ -29,9 +36,9 @@ function updateColorFromSliders(sendUpdate = false) {
   const g = parseInt(greenSlider.value);
   const b = parseInt(blueSlider.value);
 
-  const hex = `#${r.toString(16).padStart(2, '0')}${g
+  const hex = `#${r.toString(16).padStart(2, "0")}${g
     .toString(16)
-    .padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   colorPicker.value = hex;
 
   redValue.textContent = r;
@@ -64,39 +71,76 @@ function updateSlidersFromColor() {
 }
 
 // Event listeners - update display on input, send request on change
-redSlider.addEventListener('input', () => updateColorFromSliders(false));
-redSlider.addEventListener('change', () => updateColorFromSliders(true));
-greenSlider.addEventListener('input', () => updateColorFromSliders(false));
-greenSlider.addEventListener('change', () => updateColorFromSliders(true));
-blueSlider.addEventListener('input', () => updateColorFromSliders(false));
-blueSlider.addEventListener('change', () => updateColorFromSliders(true));
-colorPicker.addEventListener('input', updateSlidersFromColor);
+redSlider.addEventListener("input", () => updateColorFromSliders(false));
+redSlider.addEventListener("change", () => updateColorFromSliders(true));
+greenSlider.addEventListener("input", () => updateColorFromSliders(false));
+greenSlider.addEventListener("change", () => updateColorFromSliders(true));
+blueSlider.addEventListener("input", () => updateColorFromSliders(false));
+blueSlider.addEventListener("change", () => updateColorFromSliders(true));
+colorPicker.addEventListener("input", updateSlidersFromColor);
 
-brightnessSlider.addEventListener('input', () => {
+brightnessSlider.addEventListener("input", () => {
   brightnessValue.textContent = brightnessSlider.value;
 });
 
-brightnessSlider.addEventListener('change', () => {
+brightnessSlider.addEventListener("change", () => {
+  sendUpdateRequest();
+});
+
+transitionSpeedSlider.addEventListener("input", () => {
+  const speedLabels = [
+    "Extra Slow",
+    "Slow",
+    "Medium",
+    "Fast",
+    "Very Fast"
+  ];
+  transitionSpeedValue.textContent =
+    speedLabels[parseInt(transitionSpeedSlider.value)];
+});
+
+transitionSpeedSlider.addEventListener("change", () => {
   sendUpdateRequest();
 });
 
 // Add real-time update listeners for language change
 languageButtons.forEach((button) => {
-  button.addEventListener('change', sendUpdateRequest);
+  button.addEventListener("change", sendUpdateRequest);
+});
+
+// Add real-time update listeners for prefix mode change
+prefixModeButtons.forEach((button) => {
+  button.addEventListener("change", sendUpdateRequest);
+});
+
+// Add click listeners for transition buttons - always send update
+let currentTransition = 0;
+transitionButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const transition = parseInt(button.dataset.transition);
+    currentTransition = transition;
+
+    // Update active state
+    transitionButtons.forEach((btn) => btn.classList.remove("active"));
+    button.classList.add("active");
+
+    // Always send update to trigger animation preview
+    sendUpdateRequest();
+  });
 });
 
 // Power toggle event listener
-powerToggle.addEventListener('change', sendUpdateRequest);
+powerToggle.addEventListener("change", sendUpdateRequest);
 
 // Color mode toggle event listener
-colorModeToggle.addEventListener('change', () => {
+colorModeToggle.addEventListener("change", () => {
   setColorMode(colorModeToggle.checked);
 });
 
 // WiFi reset button event listener
-resetWifiBtn.addEventListener('click', resetWiFiSettings);
+resetWifiBtn.addEventListener("click", resetWiFiSettings);
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   // Load saved color mode preference
   const useSliders = loadColorMode();
   setColorMode(useSliders);
@@ -109,6 +153,9 @@ function updateUI(data) {
   updateLanguage(data.language);
   updateBrightness(data.brightness);
   updatePowerToggle(data.enabled);
+  updatePrefixMode(data.prefixMode);
+  updateTransition(data.transition);
+  updateTransitionSpeed(data.transitionSpeed);
 }
 
 function updateColor(red, green, blue) {
@@ -135,24 +182,61 @@ function updatePowerToggle(enabled) {
   powerToggle.checked = enabled !== undefined ? enabled : true;
 }
 
+function updatePrefixMode(prefixMode) {
+  const prefixValue = prefixMode !== undefined ? prefixMode : 0; // Default to always
+  prefixModeButtons.forEach((button) => {
+    if (parseInt(button.value) === prefixValue) {
+      button.checked = true;
+    }
+  });
+}
+
+function updateTransition(transition) {
+  const transitionValue = transition !== undefined ? transition : 0; // Default to none
+  currentTransition = transitionValue;
+  transitionButtons.forEach((button) => {
+    if (parseInt(button.dataset.transition) === transitionValue) {
+      button.classList.add("active");
+    } else {
+      button.classList.remove("active");
+    }
+  });
+}
+
+function updateTransitionSpeed(speed) {
+  const speedValue = speed !== undefined ? speed : 2; // Default to medium
+  transitionSpeedSlider.value = speedValue;
+  const speedLabels = [
+    "Extra Slow",
+    "Slow",
+    "Medium",
+    "Fast",
+    "Very Fast"
+  ];
+  transitionSpeedValue.textContent = speedLabels[speedValue];
+}
+
 // Color mode functions
 function saveColorMode(useSliders) {
-  localStorage.setItem('wordclock-color-mode', useSliders ? 'sliders' : 'picker');
+  localStorage.setItem(
+    "wordclock-color-mode",
+    useSliders ? "sliders" : "picker"
+  );
 }
 
 function loadColorMode() {
-  const saved = localStorage.getItem('wordclock-color-mode');
-  return saved === 'sliders';
+  const saved = localStorage.getItem("wordclock-color-mode");
+  return saved === "sliders";
 }
 
 function setColorMode(useSliders) {
   colorModeToggle.checked = useSliders;
   if (useSliders) {
-    colorPickerSection.style.display = 'none';
-    colorSlidersSection.style.display = 'block';
+    colorPickerSection.style.display = "none";
+    colorSlidersSection.style.display = "block";
   } else {
-    colorPickerSection.style.display = 'block';
-    colorSlidersSection.style.display = 'none';
+    colorPickerSection.style.display = "block";
+    colorSlidersSection.style.display = "none";
   }
   saveColorMode(useSliders);
 }
@@ -168,7 +252,7 @@ function getSelectedRGB() {
 }
 
 function getSelectedLanguage() {
-  let selectedLanguage = '';
+  let selectedLanguage = "";
   languageButtons.forEach((button) => {
     if (button.checked) {
       selectedLanguage = button.value;
@@ -177,24 +261,42 @@ function getSelectedLanguage() {
   return selectedLanguage;
 }
 
+function getSelectedPrefixMode() {
+  let selectedPrefixMode = 0; // Default to always
+  prefixModeButtons.forEach((button) => {
+    if (button.checked) {
+      selectedPrefixMode = parseInt(button.value);
+    }
+  });
+  return selectedPrefixMode;
+}
+
+function getSelectedTransition() {
+  return currentTransition;
+}
+
 function getSelectedBrightness() {
   return parseInt(brightnessSlider.value);
 }
 
+function getSelectedTransitionSpeed() {
+  return parseInt(transitionSpeedSlider.value);
+}
+
 function onLoad() {
-  fetch('/status')
+  fetch("/status")
     .then((response) => {
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error("Network response was not ok");
       }
       return response.json();
     })
     .then((data) => {
-      console.log('GET request successful');
+      console.log("GET request successful");
       console.log(data);
       updateUI(data);
     })
-    .catch((error) => console.error('Error sending GET request:', error));
+    .catch((error) => console.error("Error sending GET request:", error));
 }
 
 function sendUpdateRequest() {
@@ -202,6 +304,9 @@ function sendUpdateRequest() {
   const language = getSelectedLanguage();
   const brightness = getSelectedBrightness();
   const enabled = powerToggle.checked;
+  const prefixMode = getSelectedPrefixMode();
+  const transition = getSelectedTransition();
+  const transitionSpeed = getSelectedTransitionSpeed();
 
   const body = {
     red: rgb.red,
@@ -209,72 +314,75 @@ function sendUpdateRequest() {
     blue: rgb.blue,
     language: language,
     brightness: brightness,
-    enabled: enabled
+    enabled: enabled,
+    prefixMode: prefixMode,
+    transition: transition,
+    transitionSpeed: transitionSpeed
   };
 
-  fetch('/update', {
-    method: 'POST',
+  fetch("/update", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json"
     },
     body: JSON.stringify(body)
   })
     .then((response) => {
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error("Network response was not ok");
       }
-      console.log('Settings updated successfully');
+      console.log("Settings updated successfully");
       console.log(body);
     })
     .catch((error) => {
-      console.error('Error sending update request:', error);
+      console.error("Error sending update request:", error);
     });
 }
 
 // WiFi reset function
 function resetWiFiSettings() {
-  console.log('Reset WiFi button clicked');
+  console.log("Reset WiFi button clicked");
 
   if (
     confirm(
-      'Are you sure you want to reset WiFi settings? This will restart the device and open the configuration portal.'
+      "Are you sure you want to reset WiFi settings? This will restart the device and open the configuration portal."
     )
   ) {
-    console.log('User confirmed WiFi reset');
+    console.log("User confirmed WiFi reset");
 
     // Disable button to prevent multiple clicks
     resetWifiBtn.disabled = true;
-    resetWifiBtn.textContent = '🔄 Resetting...';
+    resetWifiBtn.textContent = "🔄 Resetting...";
 
-    fetch('/resetwifi', {
-      method: 'POST',
+    fetch("/resetwifi", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       }
     })
       .then((response) => {
-        console.log('Reset WiFi response:', response.status);
+        console.log("Reset WiFi response:", response.status);
         if (response.ok) {
           alert(
-            'WiFi settings reset. The device will restart and open the configuration portal.'
+            "WiFi settings reset. The device will restart and open the configuration portal."
           );
           return response.text();
         } else {
-          throw new Error('Server returned error: ' + response.status);
+          throw new Error("Server returned error: " + response.status);
         }
       })
       .then((text) => {
-        console.log('Reset response text:', text);
+        console.log("Reset response text:", text);
       })
       .catch((error) => {
-        console.error('Error resetting WiFi:', error);
-        alert('Error resetting WiFi settings: ' + error.message);
+        console.error("Error resetting WiFi:", error);
+        alert("Error resetting WiFi settings: " + error.message);
 
         // Re-enable button on error
         resetWifiBtn.disabled = false;
-        resetWifiBtn.textContent = '🔄 Reset WiFi Settings';
+        resetWifiBtn.textContent = "🔄 Reset WiFi Settings";
       });
   } else {
-    console.log('User cancelled WiFi reset');
+    console.log("User cancelled WiFi reset");
   }
 }

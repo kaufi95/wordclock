@@ -59,20 +59,15 @@ namespace deutsch
     void uhr();
 
     Adafruit_NeoPixel *strip;
-    String* currentTimeString;
     uint8_t red, green, blue;
 
     // converts time directly to LED array
-    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue, uint8_t prefixMode, String* timeString)
+    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue, uint8_t prefixMode)
     {
         strip = _strip;
         red = _red;
         green = _green;
         blue = _blue;
-        currentTimeString = timeString;
-        if (timeString) {
-            *timeString = "";
-        }
 
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
@@ -81,7 +76,7 @@ namespace deutsch
         if (showEsIst(minutes, prefixMode))
         {
             // Es ist
-            if (currentTimeString) *currentTimeString += "Es ist ";
+            Serial.print("Es ist ");
             turnLedsOn(1, 2, strip, red, green, blue); // "ES" - LEDs 1-2
             turnLedsOn(5, 7, strip, red, green, blue); // "IST" - LEDs 5-7
         }
@@ -90,33 +85,33 @@ namespace deutsch
         if (minutes >= 5 && minutes < 10)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             after();
         }
         else if (minutes >= 10 && minutes < 15)
         {
             min_ten();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             after();
         }
         else if (minutes >= 15 && minutes < 20)
         {
             quarter();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             after();
         }
         else if (minutes >= 20 && minutes < 25)
         {
             twenty();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             after();
         }
         else if (minutes >= 25 && minutes < 30)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             to();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             half();
         }
         else if (minutes >= 30 && minutes < 35)
@@ -126,37 +121,37 @@ namespace deutsch
         else if (minutes >= 35 && minutes < 40)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             after();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             half();
         }
         else if (minutes >= 40 && minutes < 45)
         {
             twenty();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             to();
         }
         else if (minutes >= 45 && minutes < 50)
         {
             quarter();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             to();
         }
         else if (minutes >= 50 && minutes < 55)
         {
             min_ten();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             to();
         }
         else if (minutes >= 55 && minutes < 60)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            Serial.print(" ");
             to();
         }
 
-        if (currentTimeString) *currentTimeString += " ";
+        Serial.print(" ");
 
         // convert hours to 12h format
         if (hours >= 12)
@@ -245,9 +240,10 @@ namespace deutsch
             strip->setPixelColor(110 + i, strip->Color(red, green, blue));
         }
 
-        if (currentTimeString) *currentTimeString += " + ";
-        if (currentTimeString) *currentTimeString += minutes % 5;
-        if (currentTimeString) *currentTimeString += " min";
+        Serial.print(" + ");
+        Serial.print(minutes % 5);
+        Serial.print(" min");
+        Serial.println();
     }
 
     // ------------------------------------------------------------
@@ -257,103 +253,103 @@ namespace deutsch
     {
         if (s)
         {
-            if (currentTimeString) *currentTimeString += "eins";
+            Serial.print("eins");
             turnLedsOn(51, 54, strip, red, green, blue);
         }
         else
         {
-            if (currentTimeString) *currentTimeString += "ein";
+            Serial.print("ein");
             turnLedsOn(51, 53, strip, red, green, blue);
         }
     }
 
     void hour_two()
     {
-        if (currentTimeString) *currentTimeString += "zwei";
+        Serial.print("zwei");
         turnLedsOn(49, 52, strip, red, green, blue);
     }
 
     void hour_three()
     {
-        if (currentTimeString) *currentTimeString += "drei";
+        Serial.print("drei");
         turnLedsOn(62, 65, strip, red, green, blue);
     }
 
     void hour_four()
     {
-        if (currentTimeString) *currentTimeString += "vier";
+        Serial.print("vier");
         turnLedsOn(88, 91, strip, red, green, blue);
     }
 
     void hour_five()
     {
-        if (currentTimeString) *currentTimeString += "fünf";
+        Serial.print("fünf");
         turnLedsOn(84, 87, strip, red, green, blue);
     }
 
     void min_five()
     {
-        if (currentTimeString) *currentTimeString += "fünf";
+        Serial.print("fünf");
         turnLedsOn(18, 21, strip, red, green, blue);
     }
 
     void hour_six()
     {
-        if (currentTimeString) *currentTimeString += "sechs";
+        Serial.print("sechs");
         turnLedsOn(56, 60, strip, red, green, blue);
     }
 
     void hour_seven()
     {
-        if (currentTimeString) *currentTimeString += "sieben";
+        Serial.print("sieben");
         turnLedsOn(66, 71, strip, red, green, blue);
     }
 
     void hour_eight()
     {
-        if (currentTimeString) *currentTimeString += "acht";
+        Serial.print("acht");
         turnLedsOn(78, 81, strip, red, green, blue);
     }
 
     void hour_nine()
     {
-        if (currentTimeString) *currentTimeString += "neun";
+        Serial.print("neun");
         turnLedsOn(73, 76, strip, red, green, blue);
     }
 
     void hour_ten()
     {
-        if (currentTimeString) *currentTimeString += "zehn";
+        Serial.print("zehn");
         turnLedsOn(103, 106, strip, red, green, blue);
     }
 
     void min_ten()
     {
-        if (currentTimeString) *currentTimeString += "zehn";
+        Serial.print("zehn");
         turnLedsOn(29, 32, strip, red, green, blue);
     }
 
     void hour_eleven()
     {
-        if (currentTimeString) *currentTimeString += "elf";
+        Serial.print("elf");
         turnLedsOn(107, 109, strip, red, green, blue);
     }
 
     void hour_twelve()
     {
-        if (currentTimeString) *currentTimeString += "zwölf";
+        Serial.print("zwölf");
         turnLedsOn(93, 97, strip, red, green, blue);
     }
 
     void quarter()
     {
-        if (currentTimeString) *currentTimeString += "viertel";
+        Serial.print("viertel");
         turnLedsOn(22, 28, strip, red, green, blue);
     }
 
     void twenty()
     {
-        if (currentTimeString) *currentTimeString += "zwanzig";
+        Serial.print("zwanzig");
         turnLedsOn(11, 17, strip, red, green, blue);
     }
 
@@ -361,25 +357,25 @@ namespace deutsch
 
     void to()
     {
-        if (currentTimeString) *currentTimeString += "vor";
+        Serial.print("vor");
         turnLedsOn(40, 42, strip, red, green, blue);
     }
 
     void after()
     {
-        if (currentTimeString) *currentTimeString += "nach";
+        Serial.print("nach");
         turnLedsOn(35, 38, strip, red, green, blue);
     }
 
     void half()
     {
-        if (currentTimeString) *currentTimeString += "halb";
+        Serial.print("halb");
         turnLedsOn(44, 47, strip, red, green, blue);
     }
 
     void uhr()
     {
-        if (currentTimeString) *currentTimeString += " uhr";
+        Serial.print(" uhr");
         turnLedsOn(99, 101, strip, red, green, blue);
     }
 

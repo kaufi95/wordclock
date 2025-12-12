@@ -8,7 +8,7 @@
 
 namespace dialekt
 {
-    void timeToLeds(time_t time, Adafruit_NeoPixel* strip, uint8_t red, uint8_t green, uint8_t blue);
+    void timeToLeds(time_t time, Adafruit_NeoPixel* strip, uint8_t red, uint8_t green, uint8_t blue, uint8_t prefixMode, String* timeString);
 }
 
 #endif

@@ -1,15 +1,15 @@
 /*
 
-H E S C E I S T H L S
+H E S C E I S C H O S
 F Ü N F Z W A N Z I G
 V I E R T E L Z E H N
-F V O R L N A C H N S
-H A L B H Z W E I N S
+F V O R L N O C H N S
+H A L B H Z W O A N S
 D R E I V S E C H S E
-S I E B E N Z N E U N
-F Ü N F E N A C H T E
-V I E R N Z W Ö L F E
-E L F Z E H N E U H R
+S I E B N E Z N Ü N E
+F Ü N F E O A C H T E
+V I E R E N Z E H N E
+E L F E I Z W Ö L F E
        . . . .
 
 */
@@ -35,9 +35,9 @@ E L F Z E H N E U H R
 #include <Adafruit_NeoPixel.h>
 #include "matrixUtils.h"
 
-namespace deutsch
+namespace dialekt
 {
-    void hour_one(bool s);
+    void hour_one();
     void hour_two();
     void hour_three();
     void hour_four();
@@ -56,11 +56,10 @@ namespace deutsch
     void to();
     void after();
     void half();
-    void uhr();
 
     Adafruit_NeoPixel *strip;
-    String* currentTimeString;
     uint8_t red, green, blue;
+    String* currentTimeString;  // Pointer to time string buffer
 
     // converts time directly to LED array
     void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue, uint8_t prefixMode, String* timeString)
@@ -69,54 +68,54 @@ namespace deutsch
         red = _red;
         green = _green;
         blue = _blue;
-        currentTimeString = timeString;
+        currentTimeString = timeString;  // Store pointer for use in other functions
+
         if (timeString) {
-            *timeString = "";
+            *timeString = "";  // Clear the string buffer
         }
 
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
 
-        // show "Es ist" based on prefixMode setting
+        // show "Es isch" based on prefixMode setting
         if (showEsIst(minutes, prefixMode))
         {
-            // Es ist
-            if (currentTimeString) *currentTimeString += "Es ist ";
+            if (timeString) *timeString += "Es isch ";
             turnLedsOn(1, 2, strip, red, green, blue); // "ES" - LEDs 1-2
-            turnLedsOn(5, 7, strip, red, green, blue); // "IST" - LEDs 5-7
+            turnLedsOn(5, 8, strip, red, green, blue); // "ISCH" - LEDs 5-8
         }
 
         // show minutes
         if (minutes >= 5 && minutes < 10)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 10 && minutes < 15)
         {
             min_ten();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 15 && minutes < 20)
         {
             quarter();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 20 && minutes < 25)
         {
             twenty();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 25 && minutes < 30)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             to();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             half();
         }
         else if (minutes >= 30 && minutes < 35)
@@ -126,37 +125,37 @@ namespace deutsch
         else if (minutes >= 35 && minutes < 40)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             after();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             half();
         }
         else if (minutes >= 40 && minutes < 45)
         {
             twenty();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 45 && minutes < 50)
         {
             quarter();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 50 && minutes < 55)
         {
             min_ten();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 55 && minutes < 60)
         {
             min_five();
-            if (currentTimeString) *currentTimeString += " ";
+            if (timeString) *timeString += " ";
             to();
         }
 
-        if (currentTimeString) *currentTimeString += " ";
+        if (timeString) *timeString += " ";
 
         // convert hours to 12h format
         if (hours >= 12)
@@ -183,14 +182,7 @@ namespace deutsch
             break;
         case 1:
             // Oans
-            if (minutes >= 0 && minutes < 5)
-            {
-                hour_one(false);
-            }
-            else
-            {
-                hour_one(true);
-            }
+            hour_one();
             break;
         case 2:
             // Zwoa
@@ -234,126 +226,115 @@ namespace deutsch
             break;
         }
 
-        if (minutes >= 0 && minutes < 5)
-        {
-            uhr();
-        }
-
         // Show minute dots (LEDs 110-113)
         for (uint8_t i = 0; i < (minutes % 5); i++)
         {
             strip->setPixelColor(110 + i, strip->Color(red, green, blue));
         }
 
-        if (currentTimeString) *currentTimeString += " + ";
-        if (currentTimeString) *currentTimeString += minutes % 5;
-        if (currentTimeString) *currentTimeString += " min";
+        if (timeString) {
+            *timeString += " + ";
+            *timeString += String(minutes % 5);
+            *timeString += " min";
+        }
     }
 
     // ------------------------------------------------------------
     // numbers as labels
 
-    void hour_one(bool s)
+    void hour_one()
     {
-        if (s)
-        {
-            if (currentTimeString) *currentTimeString += "eins";
-            turnLedsOn(51, 54, strip, red, green, blue);
-        }
-        else
-        {
-            if (currentTimeString) *currentTimeString += "ein";
-            turnLedsOn(51, 53, strip, red, green, blue);
-        }
+        Serial.print("oans");
+        turnLedsOn(51, 54, strip, red, green, blue);
     }
 
     void hour_two()
     {
-        if (currentTimeString) *currentTimeString += "zwei";
+        Serial.print("zwoa");
         turnLedsOn(49, 52, strip, red, green, blue);
     }
 
     void hour_three()
     {
-        if (currentTimeString) *currentTimeString += "drei";
+        Serial.print("drei");
         turnLedsOn(62, 65, strip, red, green, blue);
     }
 
     void hour_four()
     {
-        if (currentTimeString) *currentTimeString += "vier";
-        turnLedsOn(88, 91, strip, red, green, blue);
+        Serial.print("viere");
+        turnLedsOn(88, 92, strip, red, green, blue);
     }
 
     void hour_five()
     {
-        if (currentTimeString) *currentTimeString += "fünf";
-        turnLedsOn(84, 87, strip, red, green, blue);
+        Serial.print("fünfe");
+        turnLedsOn(83, 87, strip, red, green, blue);
     }
 
     void min_five()
     {
-        if (currentTimeString) *currentTimeString += "fünf";
+        Serial.print("fünf");
         turnLedsOn(18, 21, strip, red, green, blue);
     }
 
     void hour_six()
     {
-        if (currentTimeString) *currentTimeString += "sechs";
-        turnLedsOn(56, 60, strip, red, green, blue);
+        Serial.print("sechse");
+        turnLedsOn(55, 60, strip, red, green, blue);
     }
 
     void hour_seven()
     {
-        if (currentTimeString) *currentTimeString += "sieben";
+        Serial.print("siebne");
         turnLedsOn(66, 71, strip, red, green, blue);
     }
 
     void hour_eight()
     {
-        if (currentTimeString) *currentTimeString += "acht";
-        turnLedsOn(78, 81, strip, red, green, blue);
+        Serial.print("achte");
+        turnLedsOn(77, 81, strip, red, green, blue);
     }
 
     void hour_nine()
     {
-        if (currentTimeString) *currentTimeString += "neun";
+        Serial.print("nüne");
         turnLedsOn(73, 76, strip, red, green, blue);
     }
 
     void hour_ten()
     {
-        if (currentTimeString) *currentTimeString += "zehn";
-        turnLedsOn(103, 106, strip, red, green, blue);
+        Serial.print("zehne");
+        turnLedsOn(94, 98, strip, red, green, blue);
     }
 
     void min_ten()
     {
-        if (currentTimeString) *currentTimeString += "zehn";
+        Serial.print("zehn");
         turnLedsOn(29, 32, strip, red, green, blue);
     }
 
     void hour_eleven()
     {
-        if (currentTimeString) *currentTimeString += "elf";
-        turnLedsOn(107, 109, strip, red, green, blue);
+        Serial.print("elfe");
+        turnLedsOn(106, 109, strip, red, green, blue);
     }
 
     void hour_twelve()
     {
-        if (currentTimeString) *currentTimeString += "zwölf";
-        turnLedsOn(93, 97, strip, red, green, blue);
+        Serial.print("zwölfe");
+        turnLedsOn(99, 104, strip, red, green, blue);
     }
 
     void quarter()
     {
-        if (currentTimeString) *currentTimeString += "viertel";
+        Serial.print("viertel");
         turnLedsOn(22, 28, strip, red, green, blue);
     }
 
     void twenty()
     {
-        if (currentTimeString) *currentTimeString += "zwanzig";
+        Serial.print("zwanzig");
         turnLedsOn(11, 17, strip, red, green, blue);
     }
 
@@ -361,26 +342,20 @@ namespace deutsch
 
     void to()
     {
-        if (currentTimeString) *currentTimeString += "vor";
+        Serial.print("vor");
         turnLedsOn(40, 42, strip, red, green, blue);
     }
 
     void after()
     {
-        if (currentTimeString) *currentTimeString += "nach";
+        Serial.print("noch");
         turnLedsOn(35, 38, strip, red, green, blue);
     }
 
     void half()
     {
-        if (currentTimeString) *currentTimeString += "halb";
+        Serial.print("halb");
         turnLedsOn(44, 47, strip, red, green, blue);
     }
 
-    void uhr()
-    {
-        if (currentTimeString) *currentTimeString += " uhr";
-        turnLedsOn(99, 101, strip, red, green, blue);
-    }
-
-} // namespace deutsch
+} // namespace dialekt

@@ -59,22 +59,28 @@ namespace dialekt
 
     Adafruit_NeoPixel *strip;
     uint8_t red, green, blue;
+    String* currentTimeString;  // Pointer to time string buffer
 
     // converts time directly to LED array
-    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue)
+    void timeToLeds(time_t time, Adafruit_NeoPixel *_strip, uint8_t _red, uint8_t _green, uint8_t _blue, uint8_t prefixMode, String* timeString)
     {
         strip = _strip;
         red = _red;
         green = _green;
         blue = _blue;
+        currentTimeString = timeString;  // Store pointer for use in other functions
+
+        if (timeString) {
+            *timeString = "";  // Clear the string buffer
+        }
 
         uint8_t hours = hour(time);
         uint8_t minutes = minute(time);
 
-        // show "Es isch" randomized
-        if (showEsIst(minutes))
+        // show "Es isch" based on prefixMode setting
+        if (showEsIst(minutes, prefixMode))
         {
-            Serial.print("Es isch ");
+            if (timeString) *timeString += "Es isch ";
             turnLedsOn(1, 2, strip, red, green, blue); // "ES" - LEDs 1-2
             turnLedsOn(5, 8, strip, red, green, blue); // "ISCH" - LEDs 5-8
         }
@@ -83,33 +89,33 @@ namespace dialekt
         if (minutes >= 5 && minutes < 10)
         {
             min_five();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 10 && minutes < 15)
         {
             min_ten();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 15 && minutes < 20)
         {
             quarter();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 20 && minutes < 25)
         {
             twenty();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             after();
         }
         else if (minutes >= 25 && minutes < 30)
         {
             min_five();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             to();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             half();
         }
         else if (minutes >= 30 && minutes < 35)
@@ -119,37 +125,37 @@ namespace dialekt
         else if (minutes >= 35 && minutes < 40)
         {
             min_five();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             after();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             half();
         }
         else if (minutes >= 40 && minutes < 45)
         {
             twenty();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 45 && minutes < 50)
         {
             quarter();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 50 && minutes < 55)
         {
             min_ten();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             to();
         }
         else if (minutes >= 55 && minutes < 60)
         {
             min_five();
-            Serial.print(" ");
+            if (timeString) *timeString += " ";
             to();
         }
 
-        Serial.print(" ");
+        if (timeString) *timeString += " ";
 
         // convert hours to 12h format
         if (hours >= 12)
@@ -226,10 +232,11 @@ namespace dialekt
             strip->setPixelColor(110 + i, strip->Color(red, green, blue));
         }
 
-        Serial.print(" + ");
-        Serial.print(minutes % 5);
-        Serial.print(" min");
-        Serial.println();
+        if (timeString) {
+            *timeString += " + ";
+            *timeString += String(minutes % 5);
+            *timeString += " min";
+        }
     }
 
     // ------------------------------------------------------------
@@ -237,97 +244,97 @@ namespace dialekt
 
     void hour_one()
     {
-        Serial.print("oans");
+        if (currentTimeString) *currentTimeString += "oans";
         turnLedsOn(51, 54, strip, red, green, blue);
     }
 
     void hour_two()
     {
-        Serial.print("zwoa");
+        if (currentTimeString) *currentTimeString += "zwoa";
         turnLedsOn(49, 52, strip, red, green, blue);
     }
 
     void hour_three()
     {
-        Serial.print("drei");
+        if (currentTimeString) *currentTimeString += "drei";
         turnLedsOn(62, 65, strip, red, green, blue);
     }
 
     void hour_four()
     {
-        Serial.print("viere");
+        if (currentTimeString) *currentTimeString += "viere";
         turnLedsOn(88, 92, strip, red, green, blue);
     }
 
     void hour_five()
     {
-        Serial.print("fünfe");
+        if (currentTimeString) *currentTimeString += "fünfe";
         turnLedsOn(83, 87, strip, red, green, blue);
     }
 
     void min_five()
     {
-        Serial.print("fünf");
+        if (currentTimeString) *currentTimeString += "fünf";
         turnLedsOn(18, 21, strip, red, green, blue);
     }
 
     void hour_six()
     {
-        Serial.print("sechse");
+        if (currentTimeString) *currentTimeString += "sechse";
         turnLedsOn(55, 60, strip, red, green, blue);
     }
 
     void hour_seven()
     {
-        Serial.print("siebne");
+        if (currentTimeString) *currentTimeString += "siebne";
         turnLedsOn(66, 71, strip, red, green, blue);
     }
 
     void hour_eight()
     {
-        Serial.print("achte");
+        if (currentTimeString) *currentTimeString += "achte";
         turnLedsOn(77, 81, strip, red, green, blue);
     }
 
     void hour_nine()
     {
-        Serial.print("nüne");
+        if (currentTimeString) *currentTimeString += "nüne";
         turnLedsOn(73, 76, strip, red, green, blue);
     }
 
     void hour_ten()
     {
-        Serial.print("zehne");
+        if (currentTimeString) *currentTimeString += "zehne";
         turnLedsOn(94, 98, strip, red, green, blue);
     }
 
     void min_ten()
     {
-        Serial.print("zehn");
+        if (currentTimeString) *currentTimeString += "zehn";
         turnLedsOn(29, 32, strip, red, green, blue);
     }
 
     void hour_eleven()
     {
-        Serial.print("elfe");
+        if (currentTimeString) *currentTimeString += "elfe";
         turnLedsOn(106, 109, strip, red, green, blue);
     }
 
     void hour_twelve()
     {
-        Serial.print("zwölfe");
+        if (currentTimeString) *currentTimeString += "zwölfe";
         turnLedsOn(99, 104, strip, red, green, blue);
     }
 
     void quarter()
     {
-        Serial.print("viertel");
+        if (currentTimeString) *currentTimeString += "viertel";
         turnLedsOn(22, 28, strip, red, green, blue);
     }
 
     void twenty()
     {
-        Serial.print("zwanzig");
+        if (currentTimeString) *currentTimeString += "zwanzig";
         turnLedsOn(11, 17, strip, red, green, blue);
     }
 
@@ -335,19 +342,19 @@ namespace dialekt
 
     void to()
     {
-        Serial.print("vor");
+        if (currentTimeString) *currentTimeString += "vor";
         turnLedsOn(40, 42, strip, red, green, blue);
     }
 
     void after()
     {
-        Serial.print("noch");
+        if (currentTimeString) *currentTimeString += "noch";
         turnLedsOn(35, 38, strip, red, green, blue);
     }
 
     void half()
     {
-        Serial.print("halb");
+        if (currentTimeString) *currentTimeString += "halb";
         turnLedsOn(44, 47, strip, red, green, blue);
     }
 
