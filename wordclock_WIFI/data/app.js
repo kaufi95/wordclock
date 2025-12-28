@@ -30,6 +30,19 @@ const colorSlidersSection = document.getElementById("color-sliders-section");
 // WiFi reset button
 const resetWifiBtn = document.getElementById("reset-wifi-btn");
 
+// Track current state to detect changes
+let currentState = {
+  red: 255,
+  green: 255,
+  blue: 255,
+  language: "dialekt",
+  brightness: 128,
+  enabled: true,
+  prefixMode: 0,
+  transition: 0,
+  transitionSpeed: 2
+};
+
 // Color synchronization between picker and sliders
 function updateColorFromSliders(sendUpdate = false) {
   const r = parseInt(redSlider.value);
@@ -117,6 +130,7 @@ prefixModeButtons.forEach((button) => {
 let currentTransition = 0;
 transitionButtons.forEach((button) => {
   button.addEventListener("click", () => {
+    const previousTransition = currentTransition;
     const transition = parseInt(button.dataset.transition);
     currentTransition = transition;
 
@@ -125,7 +139,8 @@ transitionButtons.forEach((button) => {
     button.classList.add("active");
 
     // Always send update to trigger animation preview
-    sendUpdateRequest();
+    // If clicking the same transition, add forcePreview flag
+    sendUpdateRequest(previousTransition === transition);
   });
 });
 
@@ -146,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setColorMode(useSliders);
 
   onLoad();
+  setupEventSource();
 });
 
 function updateUI(data) {
@@ -156,6 +172,19 @@ function updateUI(data) {
   updatePrefixMode(data.prefixMode);
   updateTransition(data.transition);
   updateTransitionSpeed(data.transitionSpeed);
+
+  // Update current state
+  currentState = {
+    red: data.red,
+    green: data.green,
+    blue: data.blue,
+    language: data.language,
+    brightness: data.brightness,
+    enabled: data.enabled,
+    prefixMode: data.prefixMode,
+    transition: data.transition,
+    transitionSpeed: data.transitionSpeed
+  };
 }
 
 function updateColor(red, green, blue) {
@@ -299,7 +328,29 @@ function onLoad() {
     .catch((error) => console.error("Error sending GET request:", error));
 }
 
-function sendUpdateRequest() {
+function setupEventSource() {
+  const eventSource = new EventSource("/events");
+
+  eventSource.addEventListener("settings", (event) => {
+    console.log("Settings update received from server:");
+    const data = JSON.parse(event.data);
+    console.log(data);
+    updateUI(data);
+  });
+
+  eventSource.addEventListener("open", () => {
+    console.log("SSE connection established");
+  });
+
+  eventSource.addEventListener("error", (error) => {
+    console.error("SSE connection error:", error);
+    if (eventSource.readyState === EventSource.CLOSED) {
+      console.log("SSE connection closed, will attempt to reconnect...");
+    }
+  });
+}
+
+function sendUpdateRequest(forcePreview = false) {
   const rgb = getSelectedRGB();
   const language = getSelectedLanguage();
   const brightness = getSelectedBrightness();
@@ -308,17 +359,33 @@ function sendUpdateRequest() {
   const transition = getSelectedTransition();
   const transitionSpeed = getSelectedTransitionSpeed();
 
-  const body = {
-    red: rgb.red,
-    green: rgb.green,
-    blue: rgb.blue,
-    language: language,
-    brightness: brightness,
-    enabled: enabled,
-    prefixMode: prefixMode,
-    transition: transition,
-    transitionSpeed: transitionSpeed
-  };
+  // Build request body with only changed values
+  const body = {};
+
+  if (rgb.red !== currentState.red) body.red = rgb.red;
+  if (rgb.green !== currentState.green) body.green = rgb.green;
+  if (rgb.blue !== currentState.blue) body.blue = rgb.blue;
+  if (language !== currentState.language) body.language = language;
+  if (brightness !== currentState.brightness) body.brightness = brightness;
+  if (enabled !== currentState.enabled) body.enabled = enabled;
+  if (prefixMode !== currentState.prefixMode) body.prefixMode = prefixMode;
+
+  const transitionChanged = transition !== currentState.transition;
+  if (transitionChanged) body.transition = transition;
+  if (transitionSpeed !== currentState.transitionSpeed) body.transitionSpeed = transitionSpeed;
+
+  // Add forcePreview flag ONLY if explicitly requested (clicking transition button)
+  // Don't add it when other settings change
+  if (forcePreview === true) {
+    body.forcePreview = true;
+    body.transition = transition; // Ensure transition is included for preview
+  }
+
+  // If nothing changed, don't send request (unless forcePreview is set)
+  if (Object.keys(body).length === 0) {
+    console.log("No changes detected, skipping update");
+    return;
+  }
 
   fetch("/update", {
     method: "POST",
@@ -333,6 +400,9 @@ function sendUpdateRequest() {
       }
       console.log("Settings updated successfully");
       console.log(body);
+
+      // Update current state with sent values
+      Object.assign(currentState, body);
     })
     .catch((error) => {
       console.error("Error sending update request:", error);

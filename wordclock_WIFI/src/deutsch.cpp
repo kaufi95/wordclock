@@ -156,7 +156,9 @@ namespace deutsch
             to();
         }
 
-        if (currentTimeString) *currentTimeString += " ";
+        if (currentTimeString && minutes >= 5 && currentTimeString->length() > 0 && !currentTimeString->endsWith(" ")) {
+            *currentTimeString += " ";
+        }
 
         // convert hours to 12h format
         if (hours >= 12)

@@ -155,7 +155,9 @@ namespace dialekt
             to();
         }
 
-        if (timeString) *timeString += " ";
+        if (timeString && minutes >= 5 && timeString->length() > 0 && !timeString->endsWith(" ")) {
+            *timeString += " ";
+        }
 
         // convert hours to 12h format
         if (hours >= 12)

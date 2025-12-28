@@ -15,28 +15,17 @@
 
 #include <ESP32Time.h>
 
-// Optional: ArduinoOTA for wireless updates
-// Uncomment the lines below if you want OTA support
-// #include <ArduinoOTA.h>
-// #define ENABLE_OTA
-
-// Optional: Watchdog timer for auto-recovery from hangs
-// Uncomment the lines below to enable watchdog
-// #include <esp_task_wdt.h>
-// #define ENABLE_WATCHDOG
-// #define WDT_TIMEOUT 30  // Watchdog timeout in seconds
-
 #include "src/dialekt.h"
 #include "src/deutsch.h"
 
-#define VERSION "4"
+#define VERSION "4.1"
 
 // define WiFi params
 #define AP_SSID "WordClock-Setup"
 #define DNS_NAME "wordclock"
 
 // define matrix params
-#define LED_PIN 4         // define pin for LEDs
+#define LED_PIN 4  // define pin for LEDs
 #define NUM_LEDS 114
 
 // define preferences namespace
@@ -44,17 +33,17 @@
 
 // Transition animation types
 enum TransitionType {
-  TRANSITION_NONE = 0,     // No animation, instant change
-  TRANSITION_FADE = 1,     // Fade out old, fade in new
-  TRANSITION_WIPE = 2,     // Wipe from left to right
-  TRANSITION_SPARKLE = 3   // Random sparkle effect
+  TRANSITION_NONE = 0,    // No animation, instant change
+  TRANSITION_FADE = 1,    // Fade out old, fade in new
+  TRANSITION_WIPE = 2,    // Wipe from left to right
+  TRANSITION_SPARKLE = 3  // Random sparkle effect
 };
 
 // ES IST/ES ISCH display modes
 enum PrefixMode {
-  PREFIX_ALWAYS = 0,   // Always show ES IST/ES ISCH
-  PREFIX_RANDOM = 1,   // Randomly show or hide
-  PREFIX_OFF = 2       // Never show ES IST/ES ISCH
+  PREFIX_ALWAYS = 0,  // Always show ES IST/ES ISCH
+  PREFIX_RANDOM = 1,  // Randomly show or hide
+  PREFIX_OFF = 2      // Never show ES IST/ES ISCH
 };
 
 struct Config {
@@ -74,10 +63,10 @@ Config config = { 255, 255, 255, 128, "dialekt", true, TRANSITION_FADE, PREFIX_A
 
 // Status states for animation
 enum StatusState {
-  STATUS_BOOT = 1,        // 1 LED: Booting up
-  STATUS_WIFI = 2,        // 2 LEDs: Connecting to WiFi
-  STATUS_NTP = 3,         // 3 LEDs: Syncing time via NTP
-  STATUS_READY = 0        // 0 LEDs: Ready, showing time
+  STATUS_BOOT = 1,  // 1 LED: Booting up
+  STATUS_WIFI = 2,  // 2 LEDs: Connecting to WiFi
+  STATUS_NTP = 3,   // 3 LEDs: Syncing time via NTP
+  STATUS_READY = 0  // 0 LEDs: Ready, showing time
 };
 
 uint8_t lastMin = 255;  // Initialize to 255 to prevent animation on first display
@@ -89,13 +78,13 @@ StatusState currentStatus = STATUS_BOOT;
 
 // NTP timing
 unsigned long nextTimeSync = 0;
-const unsigned long NTP_SYNC_INTERVAL = 3600000; // 1 hour in milliseconds
-const unsigned long NTP_RETRY_INTERVAL = 30000; // 30 seconds for failed attempts
+const unsigned long NTP_SYNC_INTERVAL = 3600000;  // 1 hour in milliseconds
+const unsigned long NTP_RETRY_INTERVAL = 30000;   // 30 seconds for failed attempts
 unsigned long lastWiFiCheck = 0;
-const unsigned long WIFI_CHECK_INTERVAL = 10000; // Check WiFi every 10 seconds
+const unsigned long WIFI_CHECK_INTERVAL = 10000;  // Check WiFi every 10 seconds
 
 // Minute LED positions (corner LEDs on typical word clocks)
-const uint8_t MINUTE_LEDS[] = {110, 111, 112, 113};  // Adjust these to your LED layout
+const uint8_t MINUTE_LEDS[] = { 110, 111, 112, 113 };  // Adjust these to your LED layout
 const uint8_t NUM_MINUTE_LEDS = 4;
 
 // Task handles for FreeRTOS
@@ -110,6 +99,7 @@ WiFiManager wm;
 
 // create webserver
 AsyncWebServer server(80);
+AsyncEventSource events("/events");
 
 // NTP management
 WiFiUDP ntpUDP;
@@ -123,40 +113,85 @@ Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // define time change rules and timezone
 TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 };  // UTC + 2 hours
-TimeChangeRule CET = { "CET", Last, Sun, Oct, 3, 60 };   // UTC + 1 hour
+TimeChangeRule CET = { "CET", Last, Sun, Oct, 3, 60 };     // UTC + 1 hour
 Timezone AT(CEST, CET);
+
+// ------------------------------------------------------------
+// Safe serial printing functions to prevent task preemption corruption
+
+void serialPrint(const String &str) {
+  Serial.print(str);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrint(const __FlashStringHelper *str) {
+  Serial.print(str);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrint(int val) {
+  Serial.print(val);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrint(unsigned long val) {
+  Serial.print(val);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrintln(const String &str) {
+  Serial.println(str);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrintln(const __FlashStringHelper *str) {
+  Serial.println(str);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrintln(int val) {
+  Serial.println(val);
+  Serial.flush();
+  vTaskDelay(1);
+}
+
+void serialPrintln(unsigned long val) {
+  Serial.println(val);
+  Serial.flush();
+  vTaskDelay(1);
+}
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial) {
+    delay(100);
+  }
   Serial.println(F("WordClock v" VERSION " by kaufi95"));
 
   while (!LittleFS.begin(true)) {
     Serial.println(F("File system mount failed..."));
     ESP.restart();
   }
+  Serial.println(F("File system mounted"));
+  delay(1000);
 
   loadSettings();
-
-  // HARDWARE TEST MODE - Uncomment to test if serial corruption is power-related
-  // config.brightness = 10;  // Very low brightness
-  // config.red = 255; config.green = 0; config.blue = 0;  // Single color only
 
   strip.begin();
   strip.setBrightness(config.brightness);
   strip.clear();
   strip.show();
+  Serial.println("LED strip initialized");
+  delay(1000);
 
   Serial.println(F("Initializing RTC with placeholder time"));
   rtc.setTime(0, 0, 0, 1, 1, 2020);
-
-  // Initialize watchdog timer
-#ifdef ENABLE_WATCHDOG
-  Serial.print(F("Enabling watchdog timer ("));
-  Serial.print(WDT_TIMEOUT);
-  Serial.println(F(" seconds)..."));
-  esp_task_wdt_init(WDT_TIMEOUT, true);  // timeout, panic on timeout
-  Serial.println(F("Watchdog enabled - system will auto-reboot if frozen"));
-#endif
 
   // Configure WiFiManager (but don't connect yet)
   WiFi.setHostname(DNS_NAME);
@@ -170,8 +205,6 @@ void setup() {
   wm.setConnectTimeout(5);
 
   // Create tasks - they will handle WiFi and display
-  Serial.println(F("Creating tasks..."));
-
   xTaskCreatePinnedToCore(
     displayTask,
     "DisplayTask",
@@ -179,8 +212,7 @@ void setup() {
     NULL,
     2,
     &displayTaskHandle,
-    1
-  );
+    1);
 
   xTaskCreatePinnedToCore(
     networkTask,
@@ -189,18 +221,10 @@ void setup() {
     NULL,
     1,
     &networkTaskHandle,
-    0
-  );
+    0);
 
-  delay(100);
-  Serial.println(F("Tasks created successfully"));
-
-#ifdef ENABLE_WATCHDOG
-  // Add tasks to watchdog monitoring
-  esp_task_wdt_add(displayTaskHandle);
-  esp_task_wdt_add(networkTaskHandle);
-  Serial.println(F("Tasks added to watchdog monitoring"));
-#endif
+  delay(1000);
+  Serial.println(F("Tasks created"));
 }
 
 // ------------------------------------------------------------
@@ -208,16 +232,7 @@ void setup() {
 
 void loop() {
   // Tasks handle everything now, so loop just sleeps
-#ifdef ENABLE_WATCHDOG
-  esp_task_wdt_reset();  // Feed the watchdog
-#endif
   vTaskDelay(pdMS_TO_TICKS(1000));
-}
-
-void updateSettings() {
-  if (!update) return;
-  storeSettings();
-  update = false;
 }
 
 void updateTime() {
@@ -230,7 +245,6 @@ void updateTime() {
     return;
   }
 
-  Serial.println(F("Attempting NTP sync..."));
   currentStatus = STATUS_NTP;
 
   timeClient.forceUpdate();
@@ -238,24 +252,23 @@ void updateTime() {
 
   if (updateSuccess) {
     time_t time = timeClient.getEpochTime();
+    delay(500);
 
     if (time > 1577836800) {
       rtc.setTime(time);
       timeIsSynced = true;
       currentStatus = STATUS_READY;
-      Serial.println(F("✓ Time synced successfully over NTP"));
       displayTimeInfo(AT.toLocal(time));
 
       nextTimeSync = now + NTP_SYNC_INTERVAL;
-      Serial.print(F("Next NTP sync in "));
-      Serial.print(NTP_SYNC_INTERVAL / 60000);
-      Serial.println(F(" minutes"));
+      String msg = "Next NTP sync in " + String((int)(NTP_SYNC_INTERVAL / 60000)) + " minutes";
+      serialPrintln(msg);
     } else {
-      Serial.println(F("✗ NTP returned invalid time"));
+      serialPrintln(F("NTP returned invalid time"));
       scheduleRetry();
     }
   } else {
-    Serial.println(F("✗ NTP sync failed, will retry soon"));
+    serialPrintln(F("NTP sync failed"));
     scheduleRetry();
   }
 }
@@ -263,28 +276,22 @@ void updateTime() {
 void scheduleRetry() {
   // Retry failed NTP syncs more frequently
   nextTimeSync = millis() + NTP_RETRY_INTERVAL;
-  Serial.print(F("Retry NTP sync in "));
-  Serial.print(NTP_RETRY_INTERVAL / 1000);
-  Serial.println(F(" seconds"));
+  String msg = "Retry NTP sync in " + String((int)(NTP_RETRY_INTERVAL / 1000)) + " seconds";
+  serialPrintln(msg);
 }
 
 void printSettings() {
-  Serial.print(F("Red: "));
-  Serial.println(config.red);
-  Serial.print(F("Green: "));
-  Serial.println(config.green);
-  Serial.print(F("Blue: "));
-  Serial.println(config.blue);
-  Serial.print(F("Brightness: "));
-  Serial.println(config.brightness);
-  Serial.print(F("Language: "));
-  Serial.println(config.language);
-  Serial.print(F("Enabled: "));
-  Serial.println(config.enabled);
-  Serial.print(F("Transition: "));
-  Serial.println(config.transition);
-  Serial.print(F("PrefixMode: "));
-  Serial.println(config.prefixMode);
+  String line1 = "Red: " + String(config.red) + ", Green: " + String(config.green) + ", Blue: " + String(config.blue);
+  serialPrintln(line1);
+
+  String line2 = "Brightness: " + String(config.brightness) + ", Enabled: " + String(config.enabled);
+  serialPrintln(line2);
+
+  String line3 = "Language: " + config.language + ", PrefixMode: " + String(config.prefixMode);
+  serialPrintln(line3);
+
+  String line4 = "Transition: " + String(config.transition) + ", Speed: " + String(config.transitionSpeed);
+  serialPrintln(line4);
 }
 
 // ------------------------------------------------------------
@@ -305,9 +312,9 @@ void checkWiFiConnection() {
       // WiFi just reconnected
       wifiConnected = true;
       currentStatus = STATUS_NTP;  // WiFi back, waiting for NTP
-      Serial.println(F("WiFi reconnected!"));
-      Serial.print(F("IP address: "));
-      Serial.println(WiFi.localIP());
+      serialPrintln(F("WiFi reconnected!"));
+      String ipMsg = "IP address: " + WiFi.localIP().toString();
+      serialPrintln(ipMsg);
 
       // Trigger immediate NTP sync
       nextTimeSync = 0;
@@ -318,7 +325,7 @@ void checkWiFiConnection() {
       wifiConnected = false;
       timeIsSynced = false;
       currentStatus = STATUS_WIFI;  // Lost WiFi, trying to reconnect
-      Serial.println(F("WiFi connection lost! Attempting to reconnect..."));
+      serialPrintln(F("WiFi connection lost! Attempting to reconnect..."));
     }
 
     // Try to reconnect
@@ -327,17 +334,13 @@ void checkWiFiConnection() {
 }
 
 void onWiFiConnected() {
-  Serial.println(F("WiFi connected successfully!"));
-  Serial.print(F("IP address: "));
-  Serial.println(WiFi.localIP());
+  serialPrintln(F("WiFi connected successfully!"));
+  String ipMsg = "IP address: " + WiFi.localIP().toString();
+  serialPrintln(ipMsg);
 
   startNTP();
   startMDNS();
   startServer();
-
-#ifdef ENABLE_OTA
-  setupOTA();
-#endif
 }
 
 void configModeCallback(WiFiManager *myWiFiManager) {
@@ -346,6 +349,7 @@ void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println(WiFi.softAPIP());
   Serial.print(F("SSID: "));
   Serial.println(myWiFiManager->getConfigPortalSSID());
+  delay(250);
 
   // Keep animation running during captive portal
   currentStatus = STATUS_WIFI;
@@ -372,49 +376,18 @@ void startNTP() {
   timeClient.setPoolServerName("pool.ntp.org");
   timeClient.setTimeOffset(0);
   timeClient.begin();
+  delay(500);
   nextTimeSync = 0;
-  Serial.println(F("NTP client started, will sync immediately"));
+  serialPrintln(F("NTP client started, will sync immediately"));
 }
 
 void startMDNS() {
   MDNS.begin(DNS_NAME);
   MDNS.addService("http", "tcp", 80);
   MDNS.addService("wordclock", "tcp", 80);
-  Serial.println(F("mDNS responder started"));
+  delay(500);
+  serialPrintln(F("mDNS responder started"));
 }
-
-#ifdef ENABLE_OTA
-void setupOTA() {
-  ArduinoOTA.setHostname(DNS_NAME);
-  ArduinoOTA.setPassword("wordclock");  // Change this password!
-
-  ArduinoOTA.onStart([]() {
-    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-    Serial.println(F("OTA Update starting: ") + type);
-    currentStatus = STATUS_BOOT;  // Show animation during update
-  });
-
-  ArduinoOTA.onEnd([]() {
-    Serial.println(F("\nOTA Update complete!"));
-  });
-
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("OTA Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println(F("Auth Failed"));
-    else if (error == OTA_BEGIN_ERROR) Serial.println(F("Begin Failed"));
-    else if (error == OTA_CONNECT_ERROR) Serial.println(F("Connect Failed"));
-    else if (error == OTA_RECEIVE_ERROR) Serial.println(F("Receive Failed"));
-    else if (error == OTA_END_ERROR) Serial.println(F("End Failed"));
-  });
-
-  ArduinoOTA.begin();
-  Serial.println(F("OTA ready - use 'wordclock.local' as network port in Arduino IDE"));
-}
-#endif
 
 void startServer() {
   // Configure server with minimal handlers first
@@ -431,9 +404,21 @@ void startServer() {
     }
   });
 
+  // Add Server-Sent Events handler
+  events.onConnect([](AsyncEventSourceClient *client) {
+    if (client->lastId()) {
+      Serial.printf("SSE Client reconnected! Last message ID: %u\n", client->lastId());
+      Serial.flush();
+      vTaskDelay(1);
+    } else {
+      serialPrintln(F("SSE Client connected"));
+    }
+  });
+  server.addHandler(&events);
+
   // Serve static files with caching headers
   server.serveStatic("/index.html", LittleFS, "/index.html")
-    .setCacheControl("max-age=3600");
+    .setCacheControl("max-age=86400");
   server.serveStatic("/app.js", LittleFS, "/app.js")
     .setCacheControl("max-age=86400");
   server.serveStatic("/styles.css", LittleFS, "/styles.css")
@@ -441,7 +426,8 @@ void startServer() {
 
   // Start server
   server.begin();
-  Serial.println(F("WebServer started"));
+  delay(500);
+  serialPrintln(F("WebServer started"));
 }
 
 void handleNotFound(AsyncWebServerRequest *request) {
@@ -472,6 +458,7 @@ void handleStatus(AsyncWebServerRequest *request) {
   }
 
   request->send(200, "application/json", response);
+  delay(250);
 }
 
 void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
@@ -485,42 +472,70 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
     return;
   }
 
-  if (doc.containsKey("red")) {
-    config.red = (uint8_t)doc["red"];
-  }
-  if (doc.containsKey("green")) {
-    config.green = (uint8_t)doc["green"];
-  }
-  if (doc.containsKey("blue")) {
-    config.blue = (uint8_t)doc["blue"];
+  if (doc.containsKey("red") || doc.containsKey("green") || doc.containsKey("blue")) {
+    if (doc.containsKey("red"))
+      config.red = (uint8_t)doc["red"];
+    if (doc.containsKey("green"))
+      config.green = (uint8_t)doc["green"];
+    if (doc.containsKey("blue"))
+      config.blue = (uint8_t)doc["blue"];
+    String msg = "RGB: " + String(config.red) + "/" + String(config.green) + "/" + String(config.blue);
+    serialPrintln(msg);
   }
   if (doc.containsKey("brightness")) {
     config.brightness = (uint8_t)doc["brightness"];
+    String msg = "Brightness: " + String(config.brightness);
+    serialPrintln(msg);
   }
   if (doc.containsKey("language")) {
     config.language = String(doc["language"]);
+    String msg = "Language: " + config.language;
+    serialPrintln(msg);
   }
   if (doc.containsKey("enabled")) {
     config.enabled = doc["enabled"];
+    String msg = "Enabled: " + String(config.enabled);
+    serialPrintln(msg);
   }
   if (doc.containsKey("transition")) {
     uint8_t newTransition = (uint8_t)doc["transition"];
+    bool transitionChanged = (config.transition != newTransition);
     config.transition = newTransition;
-    // Always request preview animation, even if same transition
+    String msg = "Transition: " + String(config.transition);
+    serialPrintln(msg);
+
+    // Play preview if:
+    // 1. Transition changed (switching to a different animation), OR
+    // 2. User clicked the same transition button (force preview parameter)
     if (currentStatus == STATUS_READY) {
-      playPreviewAnimation = true;
+      if (transitionChanged) {
+        playPreviewAnimation = true;
+      } else if (doc.containsKey("forcePreview") && doc["forcePreview"]) {
+        playPreviewAnimation = true;
+      }
     }
   }
   if (doc.containsKey("prefixMode")) {
     config.prefixMode = (uint8_t)doc["prefixMode"];
+    String msg = "PrefixMode: " + String(config.prefixMode);
+    serialPrintln(msg);
   }
   if (doc.containsKey("transitionSpeed")) {
     config.transitionSpeed = (uint8_t)doc["transitionSpeed"];
+    String msg = "Speed: " + String(config.transitionSpeed);
+    serialPrintln(msg);
   }
 
   update = true;
 
+  // Store settings immediately
+  storeSettings();
+
+  // Broadcast settings immediately to all connected clients
+  broadcastSettings();
+
   request->send(200, "text/plain", "ok");
+  delay(250);
 }
 
 void handleResetWiFi(AsyncWebServerRequest *request) {
@@ -566,12 +581,9 @@ void loadSettings() {
 
   preferences.end();
 
+  delay(250);
   Serial.println(F("Settings loaded from preferences"));
-  Serial.print(F("Transition: "));
-  Serial.println(config.transition);
-  Serial.print(F("Transition Speed: "));
-  Serial.println(config.transitionSpeed);
-  // printSettings();  // Disabled to prevent serial output corruption
+  printSettings();
 }
 
 void storeSettings() {
@@ -588,15 +600,26 @@ void storeSettings() {
   preferences.putUChar("transSpeed", config.transitionSpeed);
 
   preferences.end();
+}
 
-  Serial.print(F("Transition saved: "));
-  Serial.println(config.transition);
-  Serial.print(F("Transition Speed saved: "));
-  Serial.println(config.transitionSpeed);
+void broadcastSettings() {
+  StaticJsonDocument<256> doc;
 
-  // Serial output disabled - causes corruption with display task
-  // safePrintln(F("Settings saved to preferences"));
-  // printSettings();
+  doc["red"] = config.red;
+  doc["green"] = config.green;
+  doc["blue"] = config.blue;
+  doc["brightness"] = config.brightness;
+  doc["language"] = config.language;
+  doc["enabled"] = config.enabled;
+  doc["transition"] = config.transition;
+  doc["prefixMode"] = config.prefixMode;
+  doc["transitionSpeed"] = config.transitionSpeed;
+
+  String response;
+  response.reserve(128);
+  serializeJson(doc, response);
+
+  events.send(response.c_str(), "settings", millis());
 }
 
 // ------------------------------------------------------------
@@ -604,7 +627,7 @@ void storeSettings() {
 
 // Helper function to get delay values based on transition speed
 // Speed 0 (Extra Slow): extra long delays, Speed 1 (Very Slow): very long delays, Speed 2 (Medium): normal delays, Speed 3 (Fast): short delays, Speed 4 (Very Fast): very short delays
-void getTransitionDelays(int& fadeDelay, int& wipeDelay, int& sparkleDelay, int& pauseDelay) {
+void getTransitionDelays(int &fadeDelay, int &wipeDelay, int &sparkleDelay, int &pauseDelay) {
   switch (config.transitionSpeed) {
     case 0:  // Extra Slow
       fadeDelay = 60;
@@ -640,39 +663,22 @@ void getTransitionDelays(int& fadeDelay, int& wipeDelay, int& sparkleDelay, int&
   }
 }
 
-// Transition animation functions
-void fadeTransition(time_t time, String* timeString) {
-  int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
-  getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
-
-  // Fade out old time completely (including minute LEDs)
+// Helper functions for transition animations
+void fadeOut(int fadeDelay) {
   for (int brightness = config.brightness; brightness >= 0; brightness -= 8) {
     strip.setBrightness(brightness);
     strip.show();
     delay(fadeDelay);
   }
-
-  // Clear and pause briefly
   strip.clear();
   strip.show();
-  delay(pauseDelay);
+}
 
-  // Set new time pattern WITHOUT any brightness changes yet
-  strip.setBrightness(255);  // Set to full brightness to store full color values
-  setPixels(time, timeString);
-
-  // Store pixel colors in temp array BEFORE any brightness manipulation
-  uint32_t tempColors[NUM_LEDS];
-  for (int i = 0; i < NUM_LEDS; i++) {
-    tempColors[i] = strip.getPixelColor(i);
-  }
-
-  // Fade in by restoring pixels at increasing brightness
+void fadeIn(uint32_t *colors, int fadeDelay) {
   for (int brightness = 8; brightness <= config.brightness; brightness += 8) {
     strip.setBrightness(brightness);
-    // Restore all pixel colors
     for (int i = 0; i < NUM_LEDS; i++) {
-      strip.setPixelColor(i, tempColors[i]);
+      strip.setPixelColor(i, colors[i]);
     }
     strip.show();
     delay(fadeDelay);
@@ -681,12 +687,35 @@ void fadeTransition(time_t time, String* timeString) {
   // Final display at exact target brightness
   strip.setBrightness(config.brightness);
   for (int i = 0; i < NUM_LEDS; i++) {
-    strip.setPixelColor(i, tempColors[i]);
+    strip.setPixelColor(i, colors[i]);
   }
   strip.show();
 }
 
-void wipeTransition(time_t time, String* timeString) {
+// Transition animation functions
+void fadeTransition(time_t time, String *timeString) {
+  int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
+  getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
+
+  // Fade out
+  fadeOut(fadeDelay);
+  delay(pauseDelay);
+
+  // Set new time pattern
+  strip.setBrightness(255);
+  setPixels(time, timeString);
+
+  // Store colors
+  uint32_t tempColors[NUM_LEDS];
+  for (int i = 0; i < NUM_LEDS; i++) {
+    tempColors[i] = strip.getPixelColor(i);
+  }
+
+  // Fade in
+  fadeIn(tempColors, fadeDelay);
+}
+
+void wipeTransition(time_t time, String *timeString) {
   int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
   getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
 
@@ -722,7 +751,7 @@ void wipeTransition(time_t time, String* timeString) {
   strip.show();
 }
 
-void sparkleTransition(time_t time, String* timeString) {
+void sparkleTransition(time_t time, String *timeString) {
   int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
   getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
 
@@ -778,7 +807,7 @@ void sparkleTransition(time_t time, String* timeString) {
   strip.show();
 }
 
-void playTransition(time_t time, String* timeString) {
+void playTransition(time_t time, String *timeString) {
   switch (config.transition) {
     case TRANSITION_NONE:
       // No animation, just update directly
@@ -810,11 +839,55 @@ void playTransition(time_t time, String* timeString) {
 
 void refreshMatrix(bool settingsChanged) {
   static bool firstDisplay = true;
+  static bool wasEnabled = true;                      // Track previous enabled state
+  static uint8_t lastBrightness = config.brightness;  // Track previous brightness
+
+  // Handle power OFF - simple fade out regardless of transition type
+  if (!config.enabled && wasEnabled) {
+    int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
+    getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
+    fadeOut(fadeDelay);
+    wasEnabled = false;
+    return;
+  }
 
   if (!config.enabled) {
     strip.clear();
     strip.show();
     return;
+  }
+
+  // Handle power ON - use the configured transition
+  if (config.enabled && !wasEnabled) {
+    wasEnabled = true;
+
+    if (currentStatus == STATUS_READY) {
+      time_t timeUTC = rtc.getEpoch();
+      time_t time = AT.toLocal(timeUTC);
+      String timeString;
+
+      // Set pixels and store colors
+      strip.setBrightness(255);
+      setPixels(time, &timeString);
+      uint32_t tempColors[NUM_LEDS];
+      for (int i = 0; i < NUM_LEDS; i++) {
+        tempColors[i] = strip.getPixelColor(i);
+      }
+
+      int fadeDelay, wipeDelay, sparkleDelay, pauseDelay;
+      getTransitionDelays(fadeDelay, wipeDelay, sparkleDelay, pauseDelay);
+
+      // Just fade in (simpler and cleaner)
+      fadeIn(tempColors, fadeDelay);
+
+      lastMin = minute(time);
+      lastBrightness = config.brightness;
+      serialPrintln(timeString);
+      update = false;
+      return;
+    }
+
+    firstDisplay = true;
   }
 
   if (currentStatus != STATUS_READY) {
@@ -845,8 +918,38 @@ void refreshMatrix(bool settingsChanged) {
     setPixels(time, &timeString);
     strip.show();
     lastMin = currentMin;
-    Serial.println(timeString);
+    serialPrintln(timeString);
     firstDisplay = false;
+    return;
+  }
+
+  // Handle brightness change with smooth rolling transition
+  if (settingsChanged && config.brightness != lastBrightness) {
+    // Smooth rolling brightness change in steps of 20
+    int step = (config.brightness > lastBrightness) ? 20 : -20;
+    int currentBrightness = lastBrightness;
+
+    while ((step > 0 && currentBrightness < config.brightness) || (step < 0 && currentBrightness > config.brightness)) {
+      currentBrightness += step;
+
+      // Clamp to target brightness
+      if (step > 0 && currentBrightness > config.brightness) {
+        currentBrightness = config.brightness;
+      } else if (step < 0 && currentBrightness < config.brightness) {
+        currentBrightness = config.brightness;
+      }
+
+      strip.setBrightness(currentBrightness);
+      strip.show();
+      delay(30);  // Delay between brightness steps
+    }
+
+    // Final brightness
+    strip.setBrightness(config.brightness);
+    strip.show();
+
+    lastBrightness = config.brightness;
+    update = false;  // Clear update flag after processing brightness change
     return;
   }
 
@@ -855,12 +958,15 @@ void refreshMatrix(bool settingsChanged) {
     strip.setBrightness(config.brightness);
     playTransition(time, &timeString);
     lastMin = currentMin;
-    Serial.println(timeString);
-  } else if (settingsChanged) {
+    lastBrightness = config.brightness;
+    serialPrintln(timeString);
+  } else if (settingsChanged && config.brightness == lastBrightness) {
+    // Only update display for non-brightness changes (color, language, etc.)
     strip.setBrightness(config.brightness);
     strip.clear();
     setPixels(time, nullptr);  // Don't build string for settings-only changes
     strip.show();
+    update = false;  // Clear update flag after processing settings change
   }
 }
 
@@ -906,16 +1012,14 @@ void showStatusAnimation() {
       uint8_t g = (config.green * blinkBrightness) / 25;
       uint8_t b = (config.blue * blinkBrightness) / 25;
       strip.setPixelColor(MINUTE_LEDS[0], r, g, b);
-    }
-    else if (currentStatus == STATUS_WIFI) {
+    } else if (currentStatus == STATUS_WIFI) {
       // WiFi: LED 0 solid, LED 1 blinks
       strip.setPixelColor(MINUTE_LEDS[0], config.red, config.green, config.blue);
       uint8_t r = (config.red * blinkBrightness) / 25;
       uint8_t g = (config.green * blinkBrightness) / 25;
       uint8_t b = (config.blue * blinkBrightness) / 25;
       strip.setPixelColor(MINUTE_LEDS[1], r, g, b);
-    }
-    else if (currentStatus == STATUS_NTP) {
+    } else if (currentStatus == STATUS_NTP) {
       // NTP: LED 0-1 solid, LED 2 blinks
       strip.setPixelColor(MINUTE_LEDS[0], config.red, config.green, config.blue);
       strip.setPixelColor(MINUTE_LEDS[1], config.red, config.green, config.blue);
@@ -930,7 +1034,7 @@ void showStatusAnimation() {
   }
 }
 
-void setPixels(time_t time, String* timeString) {
+void setPixels(time_t time, String *timeString) {
   if (config.language == "dialekt") {
     dialekt::timeToLeds(time, &strip, config.red, config.green, config.blue, config.prefixMode, timeString);
   }
@@ -945,9 +1049,6 @@ void setPixels(time_t time, String* timeString) {
 // Display Task - Runs on Core 1 (default Arduino core)
 // Handles LED matrix updates and animations at high frequency
 void displayTask(void *parameter) {
-  Serial.print(F("Display task started on core "));
-  Serial.println(xPortGetCoreID());
-
   static bool lastUpdate = false;
 
   for (;;) {
@@ -957,35 +1058,22 @@ void displayTask(void *parameter) {
 
     refreshMatrix(settingsChanged);
 
-#ifdef ENABLE_WATCHDOG
-    esp_task_wdt_reset();
-#endif
-
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
 void networkTask(void *parameter) {
-  Serial.print(F("Network task started on core "));
-  Serial.println(xPortGetCoreID());
-
-  // First, connect to WiFi
-  Serial.println(F("Starting WiFi connection..."));
   currentStatus = STATUS_WIFI;
 
   if (!wm.autoConnect(AP_SSID)) {
-    Serial.println(F("Failed to start WiFi connection"));
+    serialPrintln(F("Failed to connect to WiFi"));
     ESP.restart();
   }
 
   // Wait for WiFi to be fully connected
   while (WiFi.status() != WL_CONNECTED) {
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
-
-  Serial.println(F("WiFi connected successfully"));
-  Serial.print(F("IP: "));
-  Serial.println(WiFi.localIP());
 
   wifiConnected = true;
   currentStatus = STATUS_NTP;  // Now waiting for NTP
@@ -995,15 +1083,6 @@ void networkTask(void *parameter) {
   for (;;) {
     checkWiFiConnection();
     updateTime();
-    updateSettings();
-
-#ifdef ENABLE_OTA
-    ArduinoOTA.handle();  // Handle OTA updates
-#endif
-
-#ifdef ENABLE_WATCHDOG
-    esp_task_wdt_reset();  // Feed watchdog
-#endif
 
     vTaskDelay(pdMS_TO_TICKS(1000));  // Run every second
   }
@@ -1013,31 +1092,32 @@ void networkTask(void *parameter) {
 // display time information in readable format
 
 void displayTimeInfo(time_t t) {
-  const char* weekdays[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-  const char* months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+  const char *weekdays[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+  const char *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-  Serial.println(F(""));
-  Serial.println(F("=== Local Time ==="));
+  // Build complete message in a single line
+  String msg = "Local Time: ";
+  msg += weekdays[weekday(t) - 1];
+  msg += ", ";
+  msg += months[month(t) - 1];
+  msg += " ";
+  if (day(t) < 10)
+    msg += "0";
+  msg += String(day(t));
+  msg += ", ";
+  msg += String(year(t));
+  msg += " - ";
+  if (hour(t) < 10)
+    msg += "0";
+  msg += String(hour(t));
+  msg += ":";
+  if (minute(t) < 10)
+    msg += "0";
+  msg += String(minute(t));
+  msg += ":";
+  if (second(t) < 10)
+    msg += "0";
+  msg += String(second(t));
 
-  Serial.print(F("Date: "));
-  Serial.print(weekdays[weekday(t) - 1]);
-  Serial.print(F(", "));
-  Serial.print(months[month(t) - 1]);
-  Serial.print(F(" "));
-  if (day(t) < 10) Serial.print(F("0"));
-  Serial.print(day(t));
-  Serial.print(F(", "));
-  Serial.println(year(t));
-
-  Serial.print(F("Time: "));
-  if (hour(t) < 10) Serial.print(F("0"));
-  Serial.print(hour(t));
-  Serial.print(F(":"));
-  if (minute(t) < 10) Serial.print(F("0"));
-  Serial.print(minute(t));
-  Serial.print(F(":"));
-  if (second(t) < 10) Serial.print(F("0"));
-  Serial.println(second(t));
-
-  Serial.println(F("=================="));
+  serialPrintln(msg);
 }
