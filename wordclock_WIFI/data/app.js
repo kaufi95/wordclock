@@ -1,3 +1,24 @@
+// Map a value from one range to another (standard linear interpolation)
+function map(value, inMin, inMax, outMin, outMax) {
+  return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+}
+
+// Scale percentage (1-100) to brightness (1-255) matching Home Assistant's algorithm
+// HA uses: brightness = round(percentage * 255 / 100)
+// This ensures: 1% -> 3, 50% -> 128, 100% -> 255
+function percentageToBrightness(percentage) {
+  if (percentage < 1) percentage = 1;
+  if (percentage > 100) percentage = 100;
+  return Math.round((percentage * 255) / 100);
+}
+
+// Reverse: brightness (1-255) to percentage (1-100)
+function brightnessToPercentage(brightness) {
+  if (brightness < 1) brightness = 1;
+  if (brightness > 255) brightness = 255;
+  return Math.round((brightness * 100) / 255);
+}
+
 // UI Elements
 const colorPicker = document.getElementById("color-picker");
 
@@ -37,7 +58,7 @@ let currentState = {
   green: 255,
   blue: 255,
   language: "dialekt",
-  brightness: 50,
+  brightness: 128,  // Now stores 1-255 instead of percentage
   enabled: true,
   superBright: false,
   prefixMode: 0,
@@ -209,8 +230,11 @@ function updateLanguage(language) {
 }
 
 function updateBrightness(brightness) {
-  brightnessSlider.value = brightness || 50;
-  brightnessValue.textContent = (brightness || 50) + "%";
+  // Convert incoming brightness (1-255) to slider percentage (1-100)
+  // Use Home Assistant's reverse scaling algorithm for consistency
+  const percentage = brightnessToPercentage(brightness || 128);
+  brightnessSlider.value = percentage;
+  brightnessValue.textContent = percentage + "%";
 }
 
 function updatePowerToggle(enabled) {
@@ -315,7 +339,11 @@ function getSelectedTransition() {
 }
 
 function getSelectedBrightness() {
-  return parseInt(brightnessSlider.value);
+  // Convert slider percentage (1-100) to brightness value (1-255)
+  // Always send full range - backend will apply SuperBright cap
+  // Use Home Assistant's scaling algorithm for consistency
+  const percentage = parseInt(brightnessSlider.value);
+  return percentageToBrightness(percentage);
 }
 
 function getSelectedTransitionSpeed() {
