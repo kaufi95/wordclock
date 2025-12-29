@@ -50,16 +50,17 @@ struct Config {
   uint8_t red;              // red component (0-255)
   uint8_t green;            // green component (0-255)
   uint8_t blue;             // blue component (0-255)
-  uint8_t brightness;       // brightness
+  uint8_t brightness;       // brightness percentage (5-100)
   String language;          // language
   bool enabled;             // wordclock on/off state
   uint8_t transition;       // transition animation type
   uint8_t prefixMode;       // ES IST/ES ISCH display mode
   uint8_t transitionSpeed;  // transition speed: 1=slow, 2=medium, 3=fast
+  bool superBright;         // superbright mode: false=5-80%, true=5-100%
 };
 
-// create config object and set default values
-Config config = { 255, 255, 255, 128, "dialekt", true, TRANSITION_FADE, PREFIX_ALWAYS, 2 };
+// create config object and set default values (brightness is 50% by default)
+Config config = { 255, 255, 255, 50, "dialekt", true, TRANSITION_FADE, PREFIX_ALWAYS, 2, false };
 
 // Status states for animation
 enum StatusState {
@@ -117,6 +118,25 @@ TimeChangeRule CET = { "CET", Last, Sun, Oct, 3, 60 };     // UTC + 1 hour
 Timezone AT(CEST, CET);
 
 // ------------------------------------------------------------
+// Brightness mapping function
+// Maps brightness percentage (5-100) to actual LED brightness (0-255)
+// When superBright is OFF: 5-100% -> 5-80% of LED brightness (0.05*255 to 0.8*255)
+// When superBright is ON: 5-100% -> 5-100% of LED brightness (0.05*255 to 1.0*255)
+uint8_t mapBrightnessPercentage(uint8_t percentage, bool superBright) {
+  // Clamp percentage to 5-100 range
+  if (percentage < 5) percentage = 5;
+  if (percentage > 100) percentage = 100;
+
+  if (superBright) {
+    // SuperBright mode: 5-100% -> 0.05*255 to 1.0*255 (13 to 255)
+    return map(percentage, 5, 100, 13, 255);
+  } else {
+    // Normal mode: 5-100% -> 0.05*255 to 0.8*255 (13 to 204)
+    return map(percentage, 5, 100, 13, 192);
+  }
+}
+
+// ------------------------------------------------------------
 // Safe serial printing functions to prevent task preemption corruption
 
 void serialPrint(const String &str) {
@@ -169,9 +189,6 @@ void serialPrintln(unsigned long val) {
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) {
-    delay(100);
-  }
   Serial.println(F("WordClock v" VERSION " by kaufi95"));
 
   while (!LittleFS.begin(true)) {
@@ -184,7 +201,7 @@ void setup() {
   loadSettings();
 
   strip.begin();
-  strip.setBrightness(config.brightness);
+  strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
   strip.clear();
   strip.show();
   Serial.println("LED strip initialized");
@@ -447,6 +464,7 @@ void handleStatus(AsyncWebServerRequest *request) {
   doc["brightness"] = config.brightness;
   doc["language"] = config.language;
   doc["enabled"] = config.enabled;
+  doc["superBright"] = config.superBright;
   doc["transition"] = config.transition;
   doc["prefixMode"] = config.prefixMode;
   doc["transitionSpeed"] = config.transitionSpeed;
@@ -484,7 +502,8 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
   }
   if (doc.containsKey("brightness")) {
     config.brightness = (uint8_t)doc["brightness"];
-    String msg = "Brightness: " + String(config.brightness);
+    uint8_t actualBrightness = mapBrightnessPercentage(config.brightness, config.superBright);
+    String msg = "Brightness: " + String(config.brightness) + "% -> " + String(actualBrightness);
     serialPrintln(msg);
   }
   if (doc.containsKey("language")) {
@@ -495,6 +514,11 @@ void handleUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
   if (doc.containsKey("enabled")) {
     config.enabled = doc["enabled"];
     String msg = "Enabled: " + String(config.enabled);
+    serialPrintln(msg);
+  }
+  if (doc.containsKey("superBright")) {
+    config.superBright = doc["superBright"];
+    String msg = "SuperBright: " + String(config.superBright);
     serialPrintln(msg);
   }
   if (doc.containsKey("transition")) {
@@ -557,9 +581,21 @@ void loadSettings() {
   config.red = preferences.getUChar("red", 255);
   config.green = preferences.getUChar("green", 255);
   config.blue = preferences.getUChar("blue", 255);
-  config.brightness = preferences.getUChar("brightness", 128);
+
+  // Load brightness and convert from old format (0-255) to new percentage (5-100) if needed
+  uint8_t loadedBrightness = preferences.getUChar("brightness", 50);
+  if (loadedBrightness > 100) {
+    // Old format detected (0-255), convert to percentage
+    config.brightness = map(loadedBrightness, 16, 255, 5, 100);
+    config.brightness = constrain(config.brightness, 5, 100);
+  } else {
+    // New format (5-100)
+    config.brightness = loadedBrightness;
+  }
+
   config.language = preferences.getString("language", "dialekt");
   config.enabled = preferences.getBool("enabled", true);
+  config.superBright = preferences.getBool("superBright", false);
 
   // Load transition with validation
   uint8_t loadedTransition = preferences.getUChar("transition", TRANSITION_NONE);
@@ -595,6 +631,7 @@ void storeSettings() {
   preferences.putUChar("brightness", config.brightness);
   preferences.putString("language", config.language);
   preferences.putBool("enabled", config.enabled);
+  preferences.putBool("superBright", config.superBright);
   preferences.putUChar("transition", config.transition);
   preferences.putUChar("prefixMode", config.prefixMode);
   preferences.putUChar("transSpeed", config.transitionSpeed);
@@ -611,6 +648,7 @@ void broadcastSettings() {
   doc["brightness"] = config.brightness;
   doc["language"] = config.language;
   doc["enabled"] = config.enabled;
+  doc["superBright"] = config.superBright;
   doc["transition"] = config.transition;
   doc["prefixMode"] = config.prefixMode;
   doc["transitionSpeed"] = config.transitionSpeed;
@@ -665,7 +703,8 @@ void getTransitionDelays(int &fadeDelay, int &wipeDelay, int &sparkleDelay, int 
 
 // Helper functions for transition animations
 void fadeOut(int fadeDelay) {
-  for (int brightness = config.brightness; brightness >= 0; brightness -= 8) {
+  uint8_t actualBrightness = mapBrightnessPercentage(config.brightness, config.superBright);
+  for (int brightness = actualBrightness; brightness >= 0; brightness -= 8) {
     strip.setBrightness(brightness);
     strip.show();
     delay(fadeDelay);
@@ -675,7 +714,8 @@ void fadeOut(int fadeDelay) {
 }
 
 void fadeIn(uint32_t *colors, int fadeDelay) {
-  for (int brightness = 8; brightness <= config.brightness; brightness += 8) {
+  uint8_t actualBrightness = mapBrightnessPercentage(config.brightness, config.superBright);
+  for (int brightness = 8; brightness <= actualBrightness; brightness += 8) {
     strip.setBrightness(brightness);
     for (int i = 0; i < NUM_LEDS; i++) {
       strip.setPixelColor(i, colors[i]);
@@ -685,7 +725,7 @@ void fadeIn(uint32_t *colors, int fadeDelay) {
   }
 
   // Final display at exact target brightness
-  strip.setBrightness(config.brightness);
+  strip.setBrightness(actualBrightness);
   for (int i = 0; i < NUM_LEDS; i++) {
     strip.setPixelColor(i, colors[i]);
   }
@@ -747,7 +787,7 @@ void wipeTransition(time_t time, String *timeString) {
     }
   }
 
-  strip.setBrightness(config.brightness);
+  strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
   strip.show();
 }
 
@@ -803,7 +843,7 @@ void sparkleTransition(time_t time, String *timeString) {
     }
   }
 
-  strip.setBrightness(config.brightness);
+  strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
   strip.show();
 }
 
@@ -840,7 +880,8 @@ void playTransition(time_t time, String *timeString) {
 void refreshMatrix(bool settingsChanged) {
   static bool firstDisplay = true;
   static bool wasEnabled = true;                      // Track previous enabled state
-  static uint8_t lastBrightness = config.brightness;  // Track previous brightness
+  static uint8_t lastBrightness = config.brightness;  // Track previous brightness percentage
+  static bool lastSuperBright = config.superBright;   // Track previous superbright mode
 
   // Handle power OFF - simple fade out regardless of transition type
   if (!config.enabled && wasEnabled) {
@@ -882,6 +923,7 @@ void refreshMatrix(bool settingsChanged) {
 
       lastMin = minute(time);
       lastBrightness = config.brightness;
+      lastSuperBright = config.superBright;
       serialPrintln(timeString);
       update = false;
       return;
@@ -904,7 +946,7 @@ void refreshMatrix(bool settingsChanged) {
   if (playPreviewAnimation) {
     playPreviewAnimation = false;
     String timeString;
-    strip.setBrightness(config.brightness);
+    strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
     playTransition(time, &timeString);
     Serial.println(F("Preview animation played"));
     return;
@@ -913,7 +955,7 @@ void refreshMatrix(bool settingsChanged) {
   // Force initial display when first becoming ready
   if (firstDisplay) {
     String timeString;
-    strip.setBrightness(config.brightness);
+    strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
     strip.clear();
     setPixels(time, &timeString);
     strip.show();
@@ -923,20 +965,23 @@ void refreshMatrix(bool settingsChanged) {
     return;
   }
 
-  // Handle brightness change with smooth rolling transition
-  if (settingsChanged && config.brightness != lastBrightness) {
-    // Smooth rolling brightness change in steps of 20
-    int step = (config.brightness > lastBrightness) ? 20 : -20;
-    int currentBrightness = lastBrightness;
+  // Handle brightness or superbright change with smooth rolling transition
+  if (settingsChanged && (config.brightness != lastBrightness || config.superBright != lastSuperBright)) {
+    uint8_t lastActualBrightness = mapBrightnessPercentage(lastBrightness, lastSuperBright);
+    uint8_t targetActualBrightness = mapBrightnessPercentage(config.brightness, config.superBright);
 
-    while ((step > 0 && currentBrightness < config.brightness) || (step < 0 && currentBrightness > config.brightness)) {
+    // Smooth rolling brightness change in steps of 20
+    int step = (targetActualBrightness > lastActualBrightness) ? 20 : -20;
+    int currentBrightness = lastActualBrightness;
+
+    while ((step > 0 && currentBrightness < targetActualBrightness) || (step < 0 && currentBrightness > targetActualBrightness)) {
       currentBrightness += step;
 
       // Clamp to target brightness
-      if (step > 0 && currentBrightness > config.brightness) {
-        currentBrightness = config.brightness;
-      } else if (step < 0 && currentBrightness < config.brightness) {
-        currentBrightness = config.brightness;
+      if (step > 0 && currentBrightness > targetActualBrightness) {
+        currentBrightness = targetActualBrightness;
+      } else if (step < 0 && currentBrightness < targetActualBrightness) {
+        currentBrightness = targetActualBrightness;
       }
 
       strip.setBrightness(currentBrightness);
@@ -945,24 +990,26 @@ void refreshMatrix(bool settingsChanged) {
     }
 
     // Final brightness
-    strip.setBrightness(config.brightness);
+    strip.setBrightness(targetActualBrightness);
     strip.show();
 
     lastBrightness = config.brightness;
+    lastSuperBright = config.superBright;
     update = false;  // Clear update flag after processing brightness change
     return;
   }
 
   if (lastMin != currentMin) {
     String timeString;
-    strip.setBrightness(config.brightness);
+    strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
     playTransition(time, &timeString);
     lastMin = currentMin;
     lastBrightness = config.brightness;
+    lastSuperBright = config.superBright;
     serialPrintln(timeString);
-  } else if (settingsChanged && config.brightness == lastBrightness) {
+  } else if (settingsChanged && config.brightness == lastBrightness && config.superBright == lastSuperBright) {
     // Only update display for non-brightness changes (color, language, etc.)
-    strip.setBrightness(config.brightness);
+    strip.setBrightness(mapBrightnessPercentage(config.brightness, config.superBright));
     strip.clear();
     setPixels(time, nullptr);  // Don't build string for settings-only changes
     strip.show();

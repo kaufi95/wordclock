@@ -15,6 +15,7 @@ const transitionButtons = document.querySelectorAll(".btn-transition");
 
 const brightnessSlider = document.getElementById("brightness-slider");
 const brightnessValue = document.getElementById("brightness-value");
+const superBrightToggle = document.getElementById("superbright-toggle");
 
 const transitionSpeedSlider = document.getElementById(
   "transition-speed-slider"
@@ -36,8 +37,9 @@ let currentState = {
   green: 255,
   blue: 255,
   language: "dialekt",
-  brightness: 128,
+  brightness: 50,
   enabled: true,
+  superBright: false,
   prefixMode: 0,
   transition: 0,
   transitionSpeed: 2
@@ -93,12 +95,14 @@ blueSlider.addEventListener("change", () => updateColorFromSliders(true));
 colorPicker.addEventListener("input", updateSlidersFromColor);
 
 brightnessSlider.addEventListener("input", () => {
-  brightnessValue.textContent = brightnessSlider.value;
+  brightnessValue.textContent = brightnessSlider.value + "%";
 });
 
 brightnessSlider.addEventListener("change", () => {
   sendUpdateRequest();
 });
+
+superBrightToggle.addEventListener("change", sendUpdateRequest);
 
 transitionSpeedSlider.addEventListener("input", () => {
   const speedLabels = [
@@ -169,6 +173,7 @@ function updateUI(data) {
   updateLanguage(data.language);
   updateBrightness(data.brightness);
   updatePowerToggle(data.enabled);
+  updateSuperBright(data.superBright);
   updatePrefixMode(data.prefixMode);
   updateTransition(data.transition);
   updateTransitionSpeed(data.transitionSpeed);
@@ -181,6 +186,7 @@ function updateUI(data) {
     language: data.language,
     brightness: data.brightness,
     enabled: data.enabled,
+    superBright: data.superBright,
     prefixMode: data.prefixMode,
     transition: data.transition,
     transitionSpeed: data.transitionSpeed
@@ -203,12 +209,16 @@ function updateLanguage(language) {
 }
 
 function updateBrightness(brightness) {
-  brightnessSlider.value = brightness || 128;
-  brightnessValue.textContent = brightness || 128;
+  brightnessSlider.value = brightness || 50;
+  brightnessValue.textContent = (brightness || 50) + "%";
 }
 
 function updatePowerToggle(enabled) {
   powerToggle.checked = enabled !== undefined ? enabled : true;
+}
+
+function updateSuperBright(superBright) {
+  superBrightToggle.checked = superBright !== undefined ? superBright : false;
 }
 
 function updatePrefixMode(prefixMode) {
@@ -355,6 +365,7 @@ function sendUpdateRequest(forcePreview = false) {
   const language = getSelectedLanguage();
   const brightness = getSelectedBrightness();
   const enabled = powerToggle.checked;
+  const superBright = superBrightToggle.checked;
   const prefixMode = getSelectedPrefixMode();
   const transition = getSelectedTransition();
   const transitionSpeed = getSelectedTransitionSpeed();
@@ -368,6 +379,7 @@ function sendUpdateRequest(forcePreview = false) {
   if (language !== currentState.language) body.language = language;
   if (brightness !== currentState.brightness) body.brightness = brightness;
   if (enabled !== currentState.enabled) body.enabled = enabled;
+  if (superBright !== currentState.superBright) body.superBright = superBright;
   if (prefixMode !== currentState.prefixMode) body.prefixMode = prefixMode;
 
   const transitionChanged = transition !== currentState.transition;
